@@ -1,6 +1,6 @@
 # Evening dog walk reminder
-id: evening_dog_walk_reminder
-alias: "Evening Dog Walk Reminder"
+- id: evening_dog_walk_reminder
+  alias: "Evening Dog Walk Reminder"
 description: "Remind to walk dog in the evening"
 trigger:
   - platform: time

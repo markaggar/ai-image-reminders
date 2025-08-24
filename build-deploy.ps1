@@ -115,20 +115,15 @@ foreach ($section in $buildSections.GetEnumerator()) {
                 $isListSection = $sectionName -in @("automation:", "template:")
                 
                 if ($isListSection -and $sectionName -eq "automation:") {
-                    # For automation sections, add list marker and proper indentation
+                    # For automation sections, files already have proper list structure
                     $indentedLines = @()
-                    $first = $true
                     foreach ($line in $lines) {
                         if ($line -match "^\s*#") {
                             # Keep comments as-is
                             $indentedLines += $line
-                        } elseif ($line -match "^id:\s" -and $first) {
-                            # First content line gets list marker
-                            $indentedLines += "  - $line"
-                            $first = $false
                         } else {
-                            # All other lines get standard indentation
-                            $indentedLines += "    $line"
+                            # Add standard automation indentation (2 spaces for list items)
+                            $indentedLines += "  $line"
                         }
                     }
                     $packageContent += $indentedLines
@@ -162,7 +157,9 @@ foreach ($section in $buildSections.GetEnumerator()) {
 
 # Write the built package
 try {
-    $packageContent | Out-File $OutputFile -Encoding UTF8 -Force
+    # Use UTF8 encoding without BOM to match Home Assistant requirements
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllLines($OutputFile, $packageContent, $utf8NoBom)
     Write-Host "✅ Package built successfully: $OutputFile" -ForegroundColor Green
     
     $lineCount = (Get-Content $OutputFile).Count
