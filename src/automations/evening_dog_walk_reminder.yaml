@@ -1,0 +1,33 @@
+  # Evening dog walk reminder
+  - id: evening_dog_walk_reminder
+    alias: "Evening Dog Walk Reminder"
+    description: "Remind to walk dog in the evening"
+    trigger:
+      - platform: time
+        at: "17:00:00"
+      - platform: time
+        at: "17:30:00"
+      - platform: time
+        at: "18:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+      # Check if evening walk already done today
+      - condition: template
+        value_template: >
+          {% set evening_walk = states('input_datetime.evening_walk_done') %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
+    action:
+      - service: notify.parents
+        data:
+          title: "Time for Evening Dog Walk! 🐕"
+          message: "Don't forget to take the dog for their evening walk."
+          data:
+            tag: evening_dog_walk
+            message_speak: "yes"
+            message_display: "yes"

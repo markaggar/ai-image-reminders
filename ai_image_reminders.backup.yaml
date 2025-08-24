@@ -1,5 +1,5 @@
 # AI Image Reminders - Complete Package
-# Generated from modular components: 2025-08-23 21:08:27
+# Generated from modular components: 2025-08-23 21:09:28
 # Source: Modular components in src/
 
 # Template Sensors
@@ -618,6 +618,9 @@ input_boolean:
 ai_detection_enabled:
   name: "AI Detection System Enabled"
   icon: mdi:brain
+notifications_enabled:
+  name: "Notifications Enabled"
+  icon: mdi:bell
 kitchen_monitoring_enabled:
   name: "Kitchen Monitoring Enabled" 
   icon: mdi:chef-hat

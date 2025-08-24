@@ -1,0 +1,42 @@
+  # Mark morning walk as done when person detected with dog at driveway
+  - id: morning_walk_auto_complete
+    alias: "Morning Walk Auto Complete"
+    description: "Automatically mark morning walk as complete when detected"
+    trigger:
+      - platform: state
+        entity_id: sensor.driveway_analysis
+        to: "person_with_dog"
+    condition:
+      - condition: time
+        after: "06:00:00"
+        before: "12:00:00"
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      # Check if morning walk not already done today
+      - condition: template
+        value_template: >
+          {% set morning_walk = states('input_datetime.morning_walk_done') %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
+    action:
+      # Mark morning walk as done
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.morning_walk_done
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      
+      # Clear morning walk notification
+      - service: notify.parents
+        data:
+          message: "clear_notification"
+          data:
+            tag: morning_dog_walk
+
+      # Send acknowledgment
+      - service: notify.parents
+        data:
+          title: "Morning Walk Complete! 🎉"
+          message: "Great job taking the dog for their morning walk!"
+          tag: morning_walk_complete

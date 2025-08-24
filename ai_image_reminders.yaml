@@ -1,5 +1,5 @@
 # AI Image Reminders - Complete Package
-# Generated from modular components: 2025-08-23 21:09:28
+# Generated from modular components: 2025-08-23 22:01:52
 # Source: Modular components in src/
 
 # Template Sensors
@@ -265,6 +265,80 @@ automation:
             - service: input_boolean.turn_on
               target:
                 entity_id: input_boolean.pet_images_ready
+  # Evening dog walk reminder
+  - id: evening_dog_walk_reminder
+    alias: "Evening Dog Walk Reminder"
+    description: "Remind to walk dog in the evening"
+    trigger:
+      - platform: time
+        at: "17:00:00"
+      - platform: time
+        at: "17:30:00"
+      - platform: time
+        at: "18:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+      # Check if evening walk already done today
+      - condition: template
+        value_template: >
+          {% set evening_walk = states('input_datetime.evening_walk_done') %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
+    action:
+      - service: notify.parents
+        data:
+          title: "Time for Evening Dog Walk! 🐕"
+          message: "Don't forget to take the dog for their evening walk."
+          data:
+            tag: evening_dog_walk
+            message_speak: "yes"
+            message_display: "yes"
+  # Mark evening walk as done when person detected with dog at driveway
+  - id: evening_walk_auto_complete
+    alias: "Evening Walk Auto Complete"
+    description: "Automatically mark evening walk as complete when detected"
+    trigger:
+      - platform: state
+        entity_id: sensor.driveway_analysis
+        to: "person_with_dog"
+    condition:
+      - condition: time
+        after: "15:00:00"
+        before: "22:00:00"
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      # Check if evening walk not already done today
+      - condition: template
+        value_template: >
+          {% set evening_walk = states('input_datetime.evening_walk_done') %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
+    action:
+      # Mark evening walk as done
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.evening_walk_done
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      
+      # Clear evening walk notification
+      - service: notify.parents
+        data:
+          message: "clear_notification"
+          data:
+            tag: evening_dog_walk
+      # Send acknowledgment
+      - service: notify.parents
+        data:
+          title: "Evening Walk Complete! 🎉"
+          message: "Great job taking the dog for their evening walk!"
+          tag: evening_walk_complete
 # Family Room AI Analysis Automation
 - id: trigger_family_room_analysis
   alias: "Trigger Family Room AI Analysis"
@@ -433,6 +507,62 @@ automation:
           tag: family_room_tidy
           message_speak: "yes"
           message_display: "yes"
+  # Family room tidied acknowledgment
+  - id: family_room_tidied_acknowledgment
+    alias: "Family Room Tidied Acknowledgment"
+    description: "Acknowledge when family room has been tidied"
+    trigger:
+      - platform: state
+        entity_id: sensor.family_room_analysis
+        from: "needs_tidying"
+        to: "tidy"
+    condition:
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+    action:
+      # Clear the tidying notification
+      - service: notify.parents
+        data:
+          message: "clear_notification"
+          data:
+            tag: family_room_tidy
+      # Send acknowledgment
+      - service: notify.parents
+        data:
+          title: "Family Room Tidy! ✨"
+          message: "Thanks for tidying up the family room! It looks great."
+          data:
+            tag: family_room_tidied
+            message_speak: "yes"
+            message_display: "yes"
+  # Family room tidy notification
+  - id: family_room_tidy_notification
+    alias: "Family Room Tidy Notification"
+    description: "Send notifications when family room is analyzed as tidy"
+    trigger:
+      - platform: state
+        entity_id: sensor.family_room_analysis
+        to: "tidy"
+    condition:
+      - condition: state
+        entity_id: input_boolean.family_room_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+      # Only notify if this is a fresh analysis, not a transition
+      - condition: template
+        value_template: >
+          {% set from_state = trigger.from_state.state if trigger.from_state else 'unknown' %}
+          {{ from_state in ['unknown', 'unavailable', none] }}
+    action:
+      - service: notify.parents
+        data:
+          title: "Family Room Looking Good! ✨"
+          message: "The family room is nice and tidy. Great job keeping it organized!"
+          data:
+            tag: family_room_good
 # Kitchen AI Analysis Automation
 - id: trigger_kitchen_analysis
   alias: "Trigger Kitchen AI Analysis"
@@ -611,6 +741,80 @@ automation:
           Hey, when you're done in the kitchen, {{ state_attr('sensor.kitchen_analysis', 'specific_tasks') | default('please tidy up a bit') | lower }}.
         data:
           tag: kitchen_cleanup
+  # Morning dog walk reminder
+  - id: morning_dog_walk_reminder
+    alias: "Morning Dog Walk Reminder"
+    description: "Remind to walk dog in the morning"
+    trigger:
+      - platform: time
+        at: "08:00:00"
+      - platform: time
+        at: "08:30:00"
+      - platform: time
+        at: "09:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+      # Check if morning walk already done today
+      - condition: template
+        value_template: >
+          {% set morning_walk = states('input_datetime.morning_walk_done') %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
+    action:
+      - service: notify.parents
+        data:
+          title: "Time for Morning Dog Walk! 🐕"
+          message: "Don't forget to take the dog for their morning walk."
+          data:
+            tag: morning_dog_walk
+            message_speak: "yes"
+            message_display: "yes"
+  # Mark morning walk as done when person detected with dog at driveway
+  - id: morning_walk_auto_complete
+    alias: "Morning Walk Auto Complete"
+    description: "Automatically mark morning walk as complete when detected"
+    trigger:
+      - platform: state
+        entity_id: sensor.driveway_analysis
+        to: "person_with_dog"
+    condition:
+      - condition: time
+        after: "06:00:00"
+        before: "12:00:00"
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      # Check if morning walk not already done today
+      - condition: template
+        value_template: >
+          {% set morning_walk = states('input_datetime.morning_walk_done') %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
+    action:
+      # Mark morning walk as done
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.morning_walk_done
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      
+      # Clear morning walk notification
+      - service: notify.parents
+        data:
+          message: "clear_notification"
+          data:
+            tag: morning_dog_walk
+      # Send acknowledgment
+      - service: notify.parents
+        data:
+          title: "Morning Walk Complete! 🎉"
+          message: "Great job taking the dog for their morning walk!"
+          tag: morning_walk_complete
 
 # Input Boolean Helpers
 input_boolean:
