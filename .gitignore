@@ -2,6 +2,9 @@
 robocopy.log
 *.log
 
+# Archive directory (old/backup files)
+archive/
+
 # Python cache
 __pycache__/
 *.py[cod]
@@ -10,6 +13,7 @@ __pycache__/
 # Backup files
 *_backup.yaml
 *_old.yaml
+*_fixed.yaml
 
 # Temporary files
 *.tmp
