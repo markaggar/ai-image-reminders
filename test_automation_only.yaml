@@ -1,0 +1,14 @@
+# Test Automation Section Only
+automation:
+  - id: test_automation
+    alias: "Test Automation"
+    description: "Simple test automation"
+    trigger:
+      - platform: time
+        at: "12:00:00"
+    condition: []
+    action:
+      - service: persistent_notification.create
+        data:
+          title: "Test"
+          message: "Test automation worked"

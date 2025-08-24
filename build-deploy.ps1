@@ -108,25 +108,25 @@ foreach ($section in $buildSections.GetEnumerator()) {
             
             $content = Get-Content $file.FullName -Raw
             if ($content) {
-                # Remove any leading/trailing whitespace and split into lines
-                $lines = ($content -split "`r?`n") | Where-Object { $_ -notmatch "^#\s*$|^\s*$" -or $_ -match "\S" }
+                # Split into lines and clean up
+                $lines = ($content -split "`r?`n") 
+                
+                # Filter out completely empty lines but keep lines with just whitespace if they have content nearby
+                $cleanLines = @()
+                for ($i = 0; $i -lt $lines.Count; $i++) {
+                    $line = $lines[$i]
+                    # Keep non-empty lines and lines that are comments
+                    if ($line.Trim() -ne "" -or $line -match "^\s*#") {
+                        $cleanLines += $line
+                    }
+                }
                 
                 # Check if this is a list-based section (automation, template)
                 $isListSection = $sectionName -in @("automation:", "template:")
                 
                 if ($isListSection -and $sectionName -eq "automation:") {
-                    # For automation sections, files already have proper list structure
-                    $indentedLines = @()
-                    foreach ($line in $lines) {
-                        if ($line -match "^\s*#") {
-                            # Keep comments as-is
-                            $indentedLines += $line
-                        } else {
-                            # Add standard automation indentation (2 spaces for list items)
-                            $indentedLines += "  $line"
-                        }
-                    }
-                    $packageContent += $indentedLines
+                    # For automation sections - content already has correct indentation and list markers
+                    $packageContent += $cleanLines
                 } elseif ($isListSection -and $sectionName -eq "template:") {
                     # For template sections, content already has proper list structure
                     $indentedLines = @()

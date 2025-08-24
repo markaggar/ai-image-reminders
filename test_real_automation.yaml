@@ -1,0 +1,22 @@
+# Test Real Automation Content
+automation:
+  # Kitchen Cleanup Notification
+  - id: kitchen_cleanup_notification
+    alias: "Kitchen Cleanup Notification"
+    description: "Send notifications when kitchen needs cleaning"
+    trigger:
+      - platform: state
+        entity_id: sensor.kitchen_analysis
+        to: "needs_cleaning"
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+    action:
+      - service: notify.parents
+        data:
+          title: "Test"
+          message: "Test"
