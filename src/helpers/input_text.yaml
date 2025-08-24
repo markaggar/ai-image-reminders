@@ -1,0 +1,67 @@
+# Input Text Helper Entities
+parents_notification_service:
+  name: "Parents Notification Service"
+  initial: "notify.parents"
+  max: 100
+  icon: mdi:account-group
+
+kitchen_camera_entity:
+  name: "Kitchen Camera Entity"
+  initial: "camera.kitchen"
+  max: 100
+  icon: mdi:camera
+
+family_room_camera_entity:
+  name: "Family Room Camera Entity"
+  initial: "camera.family_room"
+  max: 100
+  icon: mdi:camera
+
+driveway_camera_entity:
+  name: "Driveway Camera Entity"
+  initial: "camera.driveway"
+  max: 100
+  icon: mdi:camera
+
+kitchen_motion_sensor_entity:
+  name: "Kitchen Person Motion Sensor Entity"
+  initial: "binary_sensor.kitchen_person_motion"
+  max: 100
+  icon: mdi:motion-sensor
+
+family_room_motion_sensor_entity:
+  name: "Family Room Person Motion Sensor Entity"  
+  initial: "binary_sensor.family_room_person_motion"
+  max: 100
+  icon: mdi:motion-sensor
+
+# AI Analysis Result Storage
+kitchen_analysis_result:
+  name: "Kitchen Analysis Result"
+  initial: "unknown"
+  max: 50
+  icon: mdi:brain
+
+kitchen_specific_tasks:
+  name: "Kitchen Specific Tasks"
+  initial: "Configure AI Tasks integration"
+  max: 200
+  icon: mdi:format-list-bulleted
+
+family_room_analysis_result:
+  name: "Family Room Analysis Result"
+  initial: "unknown"
+  max: 50
+  icon: mdi:brain
+
+family_room_specific_tasks:
+  name: "Family Room Specific Tasks"
+  initial: "Configure AI Tasks integration"
+  max: 200
+  icon: mdi:format-list-bulleted
+
+driveway_analysis_result:
+  name: "Driveway Analysis Result" 
+  initial: "empty"
+  max: 50
+  icon: mdi:car

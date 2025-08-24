@@ -1,0 +1,40 @@
+# Kitchen Cleanup Notification
+- id: kitchen_cleanup_notification
+  alias: "Kitchen Cleanup Notification"
+  description: "Send notifications when kitchen needs cleaning"
+  trigger:
+    - platform: state
+      entity_id: sensor.kitchen_analysis
+      to: "needs_cleaning"
+  condition:
+    - condition: state
+      entity_id: input_boolean.kitchen_monitoring_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.notifications_enabled
+      state: "on"
+    # Check 30-minute cooldown period
+    - condition: template
+      value_template: >
+        {% set last_notification = states('input_datetime.last_kitchen_notification') %}
+        {% if last_notification == 'unknown' %}
+          true
+        {% else %}
+          {{ (as_timestamp(now()) - as_timestamp(last_notification)) / 60 > states('input_number.notification_cooldown') | int }}
+        {% endif %}
+  action:
+    # Update last notification time
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.last_kitchen_notification
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      
+    # Send notification to parents
+    - service: notify.parents
+      data:
+        title: "Kitchen Needs Cleaning 🍽️"
+        message: >
+          Hey, when you're done in the kitchen, {{ state_attr('sensor.kitchen_analysis', 'specific_tasks') | default('please tidy up a bit') | lower }}.
+        data:
+          tag: kitchen_cleanup

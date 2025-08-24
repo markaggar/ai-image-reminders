@@ -1,0 +1,36 @@
+# Input Number Helper Entities
+kitchen_cleanliness_threshold:
+  name: "Kitchen Cleanliness Threshold"
+  min: 1
+  max: 100
+  step: 1
+  initial: 70
+  unit_of_measurement: "%"
+  icon: mdi:gauge
+  
+family_room_cleanliness_threshold:
+  name: "Family Room Cleanliness Threshold"
+  min: 1
+  max: 100
+  step: 1
+  initial: 65
+  unit_of_measurement: "%"
+  icon: mdi:gauge
+  
+notification_cooldown:
+  name: "Notification Cooldown"
+  min: 10
+  max: 240
+  step: 5
+  initial: 30
+  unit_of_measurement: "minutes"
+  icon: mdi:timer
+  
+dog_walk_max_hours:
+  name: "Dog Walk Max Hours"
+  min: 4
+  max: 16
+  step: 1
+  initial: 8
+  unit_of_measurement: "hours"
+  icon: mdi:clock

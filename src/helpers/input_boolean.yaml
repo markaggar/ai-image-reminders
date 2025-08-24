@@ -3,6 +3,10 @@ ai_detection_enabled:
   name: "AI Detection System Enabled"
   icon: mdi:brain
 
+notifications_enabled:
+  name: "Notifications Enabled"
+  icon: mdi:bell
+
 kitchen_monitoring_enabled:
   name: "Kitchen Monitoring Enabled" 
   icon: mdi:chef-hat

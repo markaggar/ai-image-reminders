@@ -1,0 +1,91 @@
+# Driveway Motion-Triggered Image Capture
+- id: driveway_image_capture
+  alias: "Driveway Motion Image Capture"
+  description: "Capture images when person or pet motion detected in driveway"
+  mode: parallel
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.driveway_person
+      to: "on"
+      id: "person_motion"
+    - platform: state
+      entity_id: binary_sensor.driveway_pet  
+      to: "on"
+      id: "pet_motion"
+  condition:
+    - condition: state
+      entity_id: input_boolean.ai_detection_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.dog_walk_monitoring_enabled
+      state: "on"
+    # Only during hours when dog walks might happen
+    - condition: time
+      after: "06:00:00"
+      before: "22:00:00"
+    # Only analyze if camera entity is configured
+    - condition: template
+      value_template: >
+        {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
+  action:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: "person_motion"
+          sequence:
+            # Reset person images ready flag
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.person_images_ready
+            # Take 3 person images with delays
+            - service: camera.snapshot
+              target:
+                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+              data:
+                filename: "/config/www/local/driveway_person_1.jpg"
+            - delay: "00:00:05"
+            - service: camera.snapshot
+              target:
+                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+              data:
+                filename: "/config/www/local/driveway_person_2.jpg"
+            - delay: "00:00:05"
+            - service: camera.snapshot
+              target:
+                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+              data:
+                filename: "/config/www/local/driveway_person_3.jpg"
+            # Set person images ready flag
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.person_images_ready
+        - conditions:
+            - condition: trigger
+              id: "pet_motion"
+          sequence:
+            # Reset pet images ready flag
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.pet_images_ready
+            # Take 3 pet images with delays
+            - service: camera.snapshot
+              target:
+                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+              data:
+                filename: "/config/www/local/driveway_pet_1.jpg"
+            - delay: "00:00:05"
+            - service: camera.snapshot
+              target:
+                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+              data:
+                filename: "/config/www/local/driveway_pet_2.jpg"
+            - delay: "00:00:05"
+            - service: camera.snapshot
+              target:
+                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+              data:
+                filename: "/config/www/local/driveway_pet_3.jpg"
+            # Set pet images ready flag
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.pet_images_ready

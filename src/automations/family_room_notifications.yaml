@@ -1,0 +1,42 @@
+# Family Room Tidying Notification
+- id: family_room_tidying_notification
+  alias: "Family Room Tidying Notification"
+  description: "Send notifications when family room needs tidying"
+  trigger:
+    - platform: state
+      entity_id: sensor.family_room_analysis
+      to: "needs_tidying"
+  condition:
+    - condition: state
+      entity_id: input_boolean.family_room_monitoring_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.notifications_enabled
+      state: "on"
+    # Check cooldown period
+    - condition: template
+      value_template: >
+        {% set last_notification = states('input_datetime.last_family_room_notification') %}
+        {% if last_notification == 'unknown' %}
+          true
+        {% else %}
+          {{ (as_timestamp(now()) - as_timestamp(last_notification)) / 60 > states('input_number.notification_cooldown') | int }}
+        {% endif %}
+  action:
+    # Update last notification time
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.last_family_room_notification
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      
+    # Send notification to parents
+    - service: notify.parents
+      data:
+        title: "Family Room Needs Tidying 🛋️"
+        message: >
+          When you get a chance, {{ state_attr('sensor.family_room_analysis', 'specific_tasks') | default('please tidy up the family room') | lower }}.
+        data:
+          tag: family_room_tidy
+          message_speak: "yes"
+          message_display: "yes"

@@ -1,0 +1,30 @@
+# Kitchen Cleaned Acknowledgment
+- id: kitchen_cleaned_acknowledgment
+  alias: "Kitchen Cleaned Acknowledgment"
+  description: "Acknowledge when kitchen has been cleaned"
+  trigger:
+    - platform: state
+      entity_id: sensor.kitchen_analysis
+      from: "needs_cleaning"
+      to: "clean"
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifications_enabled
+      state: "on"
+  action:
+    # Clear the cleanup notification
+    - service: notify.parents
+      data:
+        message: "clear_notification"
+        data:
+          tag: kitchen_cleanup
+
+    # Send acknowledgment
+    - service: notify.parents
+      data:
+        title: "Kitchen Clean! ✨"
+        message: "Great job cleaning up the kitchen! It looks fantastic."
+        data:
+          tag: kitchen_cleaned
+          message_speak: "yes"
+          message_display: "yes"
