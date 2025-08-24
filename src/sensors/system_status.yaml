@@ -1,0 +1,51 @@
+# AI Detection Status and Driveway Sensors
+- sensor:
+    name: "AI Detection Status"
+    unique_id: ai_detection_status
+    state: >
+      {% if is_state('input_boolean.ai_detection_enabled', 'on') %}
+        {% set kitchen_check = states('input_datetime.kitchen_last_check') %}
+        {% set family_check = states('input_datetime.family_room_last_check') %}
+        {% set now_ts = as_timestamp(now()) %}
+        
+        {% if kitchen_check != 'unknown' %}
+          {% set kitchen_age = (now_ts - as_timestamp(kitchen_check)) / 60 %}
+        {% else %}
+          {% set kitchen_age = 999 %}
+        {% endif %}
+        
+        {% if family_check != 'unknown' %}
+          {% set family_age = (now_ts - as_timestamp(family_check)) / 60 %}
+        {% else %}
+          {% set family_age = 999 %}
+        {% endif %}
+        
+        {% if kitchen_age < 30 and family_age < 45 %}
+          active
+        {% elif kitchen_age < 60 and family_age < 90 %}
+          monitoring
+        {% else %}
+          checking
+        {% endif %}
+      {% else %}
+        disabled
+      {% endif %}
+    icon: >
+      {% if is_state('sensor.ai_detection_status', 'active') %}
+        mdi:brain
+      {% elif is_state('sensor.ai_detection_status', 'monitoring') %}
+        mdi:brain-outline
+      {% elif is_state('sensor.ai_detection_status', 'checking') %}
+        mdi:brain-loading
+      {% else %}
+        mdi:brain-off
+      {% endif %}
+
+- sensor:
+    name: "Driveway Analysis"
+    unique_id: driveway_analysis_sensor
+    state: >
+      {{ states('input_text.driveway_analysis_result') | default('empty') }}
+    attributes:
+      last_updated: "{{ states('input_datetime.last_walk_detection') | default('never') }}"
+      monitoring_active: "{{ is_state('input_boolean.dog_walk_monitoring_enabled', 'on') }}"

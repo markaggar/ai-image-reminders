@@ -1,0 +1,109 @@
+# Kitchen AI Analysis Automation
+- id: trigger_kitchen_analysis
+  alias: "Trigger Kitchen AI Analysis"
+  description: "Analyze kitchen cleanliness when person motion detected"
+  trigger:
+    # Trigger when person motion turns on (person enters kitchen)
+    - platform: state
+      entity_id: binary_sensor.kitchen_person_motion
+      to: "on"
+    # Trigger when person motion turns off (person leaves kitchen)  
+    - platform: state
+      entity_id: binary_sensor.kitchen_person_motion
+      to: "off"
+      for:
+        minutes: 2  # Wait 2 minutes after person leaves to analyze
+    # Manual trigger via force check button
+    - platform: state
+      entity_id: input_boolean.force_kitchen_check
+      to: "on"
+  condition:
+    - condition: state
+      entity_id: input_boolean.ai_detection_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.kitchen_monitoring_enabled
+      state: "on"
+    # Only analyze if camera entity is configured
+    - condition: template
+      value_template: >
+        {{ states('input_text.kitchen_camera_entity') not in ['unknown', ''] }}
+    # Check if analysis is needed (based on time since last check or force check)
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: input_boolean.force_kitchen_check
+          state: "on"
+        - condition: template
+          value_template: >
+            {% set last_check = states('input_datetime.kitchen_last_check') %}
+            {% if last_check == 'unknown' %}
+              true
+            {% else %}
+              {{ (as_timestamp(now()) - as_timestamp(last_check)) > 300 }}
+            {% endif %}
+  action:
+    # Update last check time
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.kitchen_last_check
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+        
+    # Take camera snapshot and call AI Tasks for kitchen analysis
+    - service: camera.snapshot
+      target:
+        entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
+      data:
+        filename: "/config/www/local/kitchen_snapshot.jpg"
+        
+    - service: ai_task.generate_data
+      data:
+        task_name: "kitchen_cleanliness_analysis"
+        instructions: >
+          Analyze this kitchen image for food safety and basic cleanliness. Focus on:
+          1. Food items left out on counters (especially perishable items)
+          2. Dirty dishes in sink or on counters
+          3. Spills or messes that could attract pests
+          4. General tidiness that affects food preparation safety
+          
+          Categorize as:
+          - "clean" if kitchen is suitable for food preparation
+          - "needs_attention" if there are minor issues (few dishes, small spills)
+          - "needs_cleaning" if there are food safety concerns (food left out, many dirty dishes, significant mess)
+          
+          Be family-friendly and focus on health/safety rather than perfection.
+          Respond with just the category, then provide 2-3 specific helpful suggestions.
+        attachments:
+          - media_content_id: media-source://media_source/local/kitchen_snapshot.jpg
+            media_content_type: image/jpeg
+        entity_id: ai_task.google_ai_task
+      response_variable: kitchen_ai_response
+      
+    # Parse and store analysis result
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.kitchen_analysis_result
+      data:
+        value: >
+          {% if 'clean' in kitchen_ai_response.data | lower %}
+            clean
+          {% elif 'needs_cleaning' in kitchen_ai_response.data | lower %}
+            needs_cleaning
+          {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
+            needs_attention
+          {% else %}
+            unknown
+          {% endif %}
+    
+    # Store specific tasks/suggestions
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.kitchen_specific_tasks
+      data:
+        value: "{{ kitchen_ai_response.data }}"
+    
+    # Turn off force check trigger  
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.force_kitchen_check

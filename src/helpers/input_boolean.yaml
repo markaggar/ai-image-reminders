@@ -1,0 +1,36 @@
+# Input Boolean Helper Entities
+ai_detection_enabled:
+  name: "AI Detection System Enabled"
+  icon: mdi:brain
+
+kitchen_monitoring_enabled:
+  name: "Kitchen Monitoring Enabled" 
+  icon: mdi:chef-hat
+
+family_room_monitoring_enabled:
+  name: "Family Room Monitoring Enabled"
+  icon: mdi:sofa
+
+dog_walk_monitoring_enabled:
+  name: "Dog Walk Monitoring Enabled"
+  icon: mdi:dog
+
+dog_walk_reminders_enabled:
+  name: "Dog Walk Reminders Enabled"
+  icon: mdi:dog
+
+force_kitchen_check:
+  name: "Force Kitchen Check"
+  icon: mdi:camera-iris
+
+force_family_room_check:
+  name: "Force Family Room Check" 
+  icon: mdi:camera-iris
+
+person_images_ready:
+  name: "Person Images Ready"
+  icon: mdi:account-check
+  
+pet_images_ready:
+  name: "Pet Images Ready"
+  icon: mdi:dog

@@ -1,0 +1,122 @@
+name: Build AI Image Reminders Package
+
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'build-deploy.ps1'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'build-deploy.ps1'
+  workflow_dispatch:
+
+jobs:
+  build-package:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup PowerShell
+      shell: pwsh
+      run: |
+        Write-Host "PowerShell version: $($PSVersionTable.PSVersion)"
+        
+    - name: Build package from modular components
+      shell: pwsh
+      run: |
+        Write-Host "=== Building AI Image Reminders Package ==="
+        
+        # Build the package (build-only mode)
+        ./build-deploy.ps1 -BuildOnly -Verbose
+        
+        # Verify the build
+        if (Test-Path "ai_image_reminders.yaml") {
+          $lineCount = (Get-Content "ai_image_reminders.yaml").Count
+          Write-Host "✅ Package built successfully with $lineCount lines"
+          
+          # Show structure summary
+          Write-Host "📊 Package structure:"
+          $content = Get-Content "ai_image_reminders.yaml" -Raw
+          
+          if ($content -match "template:") { Write-Host "  ✓ Template sensors" }
+          if ($content -match "automation:") { Write-Host "  ✓ Automations" }
+          if ($content -match "script:") { Write-Host "  ✓ Scripts" }
+          if ($content -match "input_boolean:") { Write-Host "  ✓ Input booleans" }
+          if ($content -match "input_datetime:") { Write-Host "  ✓ Input datetimes" }
+          if ($content -match "input_number:") { Write-Host "  ✓ Input numbers" }
+          if ($content -match "input_text:") { Write-Host "  ✓ Input text helpers" }
+          
+        } else {
+          Write-Error "❌ Package build failed - output file not found"
+          exit 1
+        }
+        
+    - name: Validate YAML syntax
+      shell: pwsh
+      run: |
+        Write-Host "=== Validating YAML syntax ==="
+        
+        try {
+          # Simple PowerShell YAML validation
+          $content = Get-Content "ai_image_reminders.yaml" -Raw
+          
+          # Check for basic YAML issues
+          $lines = $content -split "`r?`n"
+          $issuesFound = 0
+          
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i]
+            $lineNum = $i + 1
+            
+            # Check for tabs (should use spaces)
+            if ($line -match "`t") {
+              Write-Warning "Line $lineNum`: Contains tabs (should use spaces)"
+              $issuesFound++
+            }
+            
+            # Check for trailing whitespace
+            if ($line -match " +$") {
+              Write-Warning "Line $lineNum`: Has trailing whitespace"
+              $issuesFound++
+            }
+          }
+          
+          if ($issuesFound -eq 0) {
+            Write-Host "✅ YAML validation passed"
+          } else {
+            Write-Warning "⚠️  Found $issuesFound potential YAML issues"
+          }
+          
+        } catch {
+          Write-Error "❌ YAML validation failed: $($_.Exception.Message)"
+          exit 1
+        }
+        
+    - name: Upload built package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ai-image-reminders-package
+        path: ai_image_reminders.yaml
+        retention-days: 30
+        
+    - name: Commit built package (if changed)
+      if: github.event_name != 'pull_request'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if git diff --quiet ai_image_reminders.yaml; then
+          echo "📝 No changes to built package"
+        else
+          echo "📝 Built package has changes - committing"
+          git add ai_image_reminders.yaml
+          git commit -m "Auto-build: Update package from modular components
+
+          Built from components in src/
+          Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Trigger: ${{ github.event_name }} on ${{ github.ref_name }}"
+          git push
+        fi
