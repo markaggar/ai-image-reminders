@@ -1,6 +1,29 @@
 # AI Image Reminders - Complete Package
-# Generated from modular components: 2025-08-23 22:01:52
+# Comprehensive Home Assistant package using AI Tasks and native automations
+# ADHD-focused image reminders for kitchen cleanliness, family room tidying, and dog walking
+#
+# Generated from modular components: 2025-08-23 22:05:39
 # Source: Modular components in src/
+#
+# Features:
+# - Kitchen cleanliness monitoring with AI image analysis
+# - Family room tidiness detection and reminders
+# - Dog walking reminders with automated driveway detection
+# - Smart notification system with ADHD-friendly design
+# - Configurable thresholds and notification cooldowns
+#
+# Requirements:
+# - AI Tasks integration (ai_task.google_ai_task entity)
+# - Camera entities for kitchen, family room, and driveway
+# - Motion sensors for person/pet detection
+# - Notification service configured as notify.parents
+#
+# Configuration:
+# - Set camera entity IDs in input_text helpers
+# - Adjust cleanliness thresholds via input_number sliders
+# - Enable/disable monitoring via input_boolean toggles
+#
+
 
 # Template Sensors
 template:

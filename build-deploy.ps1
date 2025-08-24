@@ -33,10 +33,26 @@ if (Test-Path $OutputFile) {
 
 # Build the package
 $packageContent = @()
-$packageContent += "# AI Image Reminders - Complete Package"
-$packageContent += "# Generated from modular components: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-$packageContent += "# Source: Modular components in $SourceDir/"
-$packageContent += ""
+
+# Add header from header.yaml file if it exists
+$headerFile = Join-Path $SourceDir "header.yaml"
+if (Test-Path $headerFile) {
+    Write-Host "Adding package header..." -ForegroundColor Cyan
+    $headerContent = Get-Content $headerFile -Raw
+    if ($headerContent) {
+        # Replace timestamp placeholder with actual timestamp
+        $headerContent = $headerContent -replace '\[BUILD_TIMESTAMP\]', (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+        $headerLines = ($headerContent -split "`r?`n")
+        $packageContent += $headerLines
+        $packageContent += ""
+    }
+} else {
+    # Fallback to simple header if header.yaml doesn't exist
+    $packageContent += "# AI Image Reminders - Complete Package"
+    $packageContent += "# Generated from modular components: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    $packageContent += "# Source: Modular components in $SourceDir/"
+    $packageContent += ""
+}
 
 # Component build order and sections
 $buildSections = [ordered]@{
