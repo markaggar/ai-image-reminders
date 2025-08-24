@@ -124,3 +124,4 @@
     - service: input_boolean.turn_off
       target:
         entity_id: input_boolean.force_family_room_check
+

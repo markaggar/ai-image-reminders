@@ -1,5 +1,5 @@
-  # Family room tidied acknowledgment
-  - id: family_room_tidied_acknowledgment
+# Family room tidied acknowledgment
+- id: family_room_tidied_acknowledgment
     alias: "Family Room Tidied Acknowledgment"
     description: "Acknowledge when family room has been tidied"
     trigger:
@@ -28,3 +28,4 @@
             tag: family_room_tidied
             message_speak: "yes"
             message_display: "yes"
+

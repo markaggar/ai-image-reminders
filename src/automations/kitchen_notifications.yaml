@@ -38,3 +38,4 @@
           Hey, when you're done in the kitchen, {{ state_attr('sensor.kitchen_analysis', 'specific_tasks') | default('please tidy up a bit') | lower }}.
         data:
           tag: kitchen_cleanup
+

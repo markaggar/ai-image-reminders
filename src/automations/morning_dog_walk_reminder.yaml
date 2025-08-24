@@ -1,5 +1,5 @@
-  # Morning dog walk reminder
-  - id: morning_dog_walk_reminder
+# Morning dog walk reminder
+- id: morning_dog_walk_reminder
     alias: "Morning Dog Walk Reminder"
     description: "Remind to walk dog in the morning"
     trigger:
@@ -31,3 +31,4 @@
             tag: morning_dog_walk
             message_speak: "yes"
             message_display: "yes"
+

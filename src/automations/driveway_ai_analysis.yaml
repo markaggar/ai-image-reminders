@@ -79,3 +79,4 @@
         entity_id: 
           - input_boolean.person_images_ready
           - input_boolean.pet_images_ready
+

@@ -1,5 +1,5 @@
-  # Family room tidy notification
-  - id: family_room_tidy_notification
+# Family room tidy notification
+- id: family_room_tidy_notification
     alias: "Family Room Tidy Notification"
     description: "Send notifications when family room is analyzed as tidy"
     trigger:
@@ -25,3 +25,4 @@
           message: "The family room is nice and tidy. Great job keeping it organized!"
           data:
             tag: family_room_good
+

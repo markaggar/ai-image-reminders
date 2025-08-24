@@ -107,3 +107,4 @@
     - service: input_boolean.turn_off
       target:
         entity_id: input_boolean.force_kitchen_check
+

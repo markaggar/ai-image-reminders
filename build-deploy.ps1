@@ -109,8 +109,46 @@ foreach ($section in $buildSections.GetEnumerator()) {
             $content = Get-Content $file.FullName -Raw
             if ($content) {
                 # Remove any leading/trailing whitespace and split into lines
-                $lines = ($content -split "`r?`n") | Where-Object { $_ -ne "" }
-                $packageContent += $lines
+                $lines = ($content -split "`r?`n") | Where-Object { $_ -notmatch "^#\s*$|^\s*$" -or $_ -match "\S" }
+                
+                # Check if this is a list-based section (automation, template)
+                $isListSection = $sectionName -in @("automation:", "template:")
+                
+                if ($isListSection -and $sectionName -eq "automation:") {
+                    # For automation sections, add list marker and proper indentation
+                    $indentedLines = @()
+                    $first = $true
+                    foreach ($line in $lines) {
+                        if ($line -match "^\s*#") {
+                            # Keep comments as-is
+                            $indentedLines += $line
+                        } elseif ($line -match "^id:\s" -and $first) {
+                            # First content line gets list marker
+                            $indentedLines += "  - $line"
+                            $first = $false
+                        } else {
+                            # All other lines get standard indentation
+                            $indentedLines += "    $line"
+                        }
+                    }
+                    $packageContent += $indentedLines
+                } elseif ($isListSection -and $sectionName -eq "template:") {
+                    # For template sections, content already has proper list structure
+                    $indentedLines = @()
+                    foreach ($line in $lines) {
+                        if ($line -match "^\s*#") {
+                            # Keep comments as-is
+                            $indentedLines += $line
+                        } else {
+                            # Add standard template indentation
+                            $indentedLines += "  $line"
+                        }
+                    }
+                    $packageContent += $indentedLines
+                } else {
+                    # For non-list sections, just add the content as-is
+                    $packageContent += $lines
+                }
                 $fileCount++
             }
         }
