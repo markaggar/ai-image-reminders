@@ -1,0 +1,10 @@
+# AI Image Reminders - Home Assistant Package
+# This package uses native Home Assistant features and requires no additional Python packages
+
+# Required Home Assistant Integrations:
+# - AI Tasks (built-in as of 2025.8.0)
+# - Google Generative AI Conversation (for AI analysis)
+# - Camera (for snapshots)
+# - Notify (for parent notifications)
+
+# No additional Python packages needed - this is a pure Home Assistant configuration package!
