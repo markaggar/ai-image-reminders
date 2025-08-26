@@ -2,7 +2,7 @@
 # Comprehensive Home Assistant package using AI Tasks and native automations
 # ADHD-focused image reminders for kitchen cleanliness, family room tidying, and dog walking
 #
-# Generated from modular components: 2025-08-25 19:48:19
+# Generated from modular components: 2025-08-25 20:01:46
 # Source: Modular components in src/
 #
 # Features:
@@ -40,10 +40,10 @@ template:
       name: "Family Room Analysis"
       unique_id: family_room_analysis_sensor
       state: >
-        {{ states('sensor.family_room_tidy_status') | default(states('input_text.family_room_analysis_result')) | default('unknown') }}
+        {{ states('sensor.family_room_tidy_status') | default('unknown') }}
       attributes:
         specific_tasks: >
-          {{ state_attr('sensor.family_room_tidy_status', 'tasks') | default(states('input_text.family_room_specific_tasks')) | default('Set up AI Tasks integration for automated analysis') }}
+          {{ state_attr('sensor.family_room_tidy_status', 'tasks') | default('Set up AI Tasks integration for automated analysis') }}
         last_updated: "{{ state_attr('sensor.family_room_tidy_status', 'timestamp') | default(states('input_datetime.family_room_last_check')) | default('never') }}"
         threshold: "{{ states('input_number.family_room_cleanliness_threshold') }}%"
   
@@ -60,10 +60,10 @@ template:
       name: "Kitchen Analysis"
       unique_id: kitchen_analysis_sensor
       state: >
-        {{ states('sensor.kitchen_clean_status') | default(states('input_text.kitchen_analysis_result')) | default('unknown') }}
+        {{ states('sensor.kitchen_clean_status') | default('unknown') }}
       attributes:
         specific_tasks: >
-          {{ state_attr('sensor.kitchen_clean_status', 'tasks') | default(states('input_text.kitchen_specific_tasks')) | default('Set up AI Tasks integration for automated analysis') }}
+          {{ state_attr('sensor.kitchen_clean_status', 'tasks') | default('Set up AI Tasks integration for automated analysis') }}
         last_updated: "{{ state_attr('sensor.kitchen_clean_status', 'timestamp') | default(states('input_datetime.kitchen_last_check')) | default('never') }}"
         threshold: "{{ states('input_number.kitchen_cleanliness_threshold') }}%"
   
@@ -602,20 +602,6 @@ automation:
           replace_attributes: true
         target:
           entity_id: sensor.family_room_tidy_status
-      # Also update the legacy input_text for backwards compatibility
-      - service: input_text.set_value
-        target:
-          entity_id: input_text.family_room_analysis_result
-        data:
-          value: >
-            {% set response = family_room_ai_response.data | lower %}
-            {% if 'needs_tidying' in response %}
-              needs_tidying
-            {% elif 'tidy' in response %}
-              tidy  
-            {% else %}
-              unknown
-            {% endif %}
       # Turn off force check trigger  
       - service: input_boolean.turn_off
         target:
@@ -837,21 +823,6 @@ automation:
           replace_attributes: true
         target:
           entity_id: sensor.kitchen_clean_status
-      # Also update the legacy input_text for backwards compatibility
-      - service: input_text.set_value
-        target:
-          entity_id: input_text.kitchen_analysis_result
-        data:
-          value: >
-            {% if 'needs_cleaning' in kitchen_ai_response.data | lower %}
-              needs_cleaning
-            {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
-              needs_attention
-            {% elif 'clean' in kitchen_ai_response.data | lower %}
-              clean
-            {% else %}
-              unknown
-            {% endif %}
       # Turn off force check trigger  
       - service: input_boolean.turn_off
         target:

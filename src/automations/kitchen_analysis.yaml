@@ -110,22 +110,6 @@
         replace_attributes: true
       target:
         entity_id: sensor.kitchen_clean_status
-        
-    # Also update the legacy input_text for backwards compatibility
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.kitchen_analysis_result
-      data:
-        value: >
-          {% if 'needs_cleaning' in kitchen_ai_response.data | lower %}
-            needs_cleaning
-          {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
-            needs_attention
-          {% elif 'clean' in kitchen_ai_response.data | lower %}
-            clean
-          {% else %}
-            unknown
-          {% endif %}
     
     # Turn off force check trigger  
     - service: input_boolean.turn_off

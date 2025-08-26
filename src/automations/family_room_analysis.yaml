@@ -116,21 +116,6 @@
       target:
         entity_id: sensor.family_room_tidy_status
 
-    # Also update the legacy input_text for backwards compatibility
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.family_room_analysis_result
-      data:
-        value: >
-          {% set response = family_room_ai_response.data | lower %}
-          {% if 'needs_tidying' in response %}
-            needs_tidying
-          {% elif 'tidy' in response %}
-            tidy  
-          {% else %}
-            unknown
-          {% endif %}
-    
     # Turn off force check trigger  
     - service: input_boolean.turn_off
       target:
