@@ -3,9 +3,6 @@ input_text:
   notification_target:
     name: "Notification Target"
     initial: "liam"
-    options:
-      - liam
-      - parents
     max: 20
     icon: mdi:account-circle
 
@@ -46,9 +43,4 @@ input_text:
     max: 100
     icon: mdi:motion-sensor
 
-  # Legacy Analysis Storage (fallback for variable sensors)
-  driveway_analysis_result:
-    name: "Driveway Analysis Result" 
-    initial: "empty"
-    max: 50
-    icon: mdi:car
+

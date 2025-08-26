@@ -2,7 +2,7 @@
 # Comprehensive Home Assistant package using AI Tasks and native automations
 # ADHD-focused image reminders for kitchen cleanliness, family room tidying, and dog walking
 #
-# Generated from modular components: 2025-08-25 20:01:46
+# Generated from modular components: 2025-08-25 20:07:54
 # Source: Modular components in src/
 #
 # Features:
@@ -1404,9 +1404,6 @@ input_text:
   notification_target:
     name: "Notification Target"
     initial: "liam"
-    options:
-      - liam
-      - parents
     max: 20
     icon: mdi:account-circle
 
@@ -1447,11 +1444,6 @@ input_text:
     max: 100
     icon: mdi:motion-sensor
 
-  # Legacy Analysis Storage (fallback for variable sensors)
-  driveway_analysis_result:
-    name: "Driveway Analysis Result" 
-    initial: "empty"
-    max: 50
-    icon: mdi:car
+
 
 
