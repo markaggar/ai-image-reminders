@@ -2,7 +2,7 @@
 # Comprehensive Home Assistant package using AI Tasks and native automations
 # ADHD-focused image reminders for kitchen cleanliness, family room tidying, and dog walking
 #
-# Generated from modular components: 2025-08-25 20:19:27
+# Generated from modular components: 2025-08-25 22:09:06
 # Source: Modular components in src/
 #
 # Features:
@@ -174,6 +174,84 @@ template:
 
 # Automations
 automation:
+  # Driveway AI Analysis Automation
+  - id: driveway_ai_analysis
+    alias: "Driveway AI Analysis"
+    description: "Analyze driveway images when both person and pet images are ready"
+    trigger:
+      - platform: state
+        entity_id: 
+          - input_boolean.person_images_ready
+          - input_boolean.pet_images_ready
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.ai_detection_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      # Both image sets must be ready
+      - condition: state
+        entity_id: input_boolean.person_images_ready
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.pet_images_ready
+        state: "on"
+      # Only analyze if camera entity is configured
+      - condition: template
+        value_template: >
+          {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
+    action:
+      # Update last detection time
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.last_walk_detection
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      # Analyze all 6 images with AI Tasks
+      - service: ai_task.generate_data
+        data:
+          task_name: "driveway_person_dog_detection"
+          instructions: >
+            Analyze these driveway images captured from person motion (first 3) and pet motion (last 3). Look for:
+            1. A person walking with a dog
+            2. Person and dog together in the scene
+            3. Dog walking activity (leash, person + dog movement)
+            If you see a person with a dog facing away from the camera or walking down the steps (that appears to be leaving), respond "starting_dog_walk".
+            If you see a person with a dog facing toward the camera or walking up the steps (that appears to be arriving), respond "ending_dog_walk".
+            If you see only a person, respond "person_only".
+            If you see only a dog, respond "dog_only".
+            If you see neither or just empty driveway, respond "empty".
+            Some of the images may not have anyone or any animal in the scene. Ignore those except for using the timestamp in the upper right corner to infer direction of travel.
+            Focus on detecting dog walking activity specifically and whether the walk is just starting or ending.
+          attachments:
+            - media_content_id: media-source://media_source/local/driveway_person_1.jpg
+              media_content_type: image/jpeg
+            - media_content_id: media-source://media_source/local/driveway_person_2.jpg
+              media_content_type: image/jpeg
+            - media_content_id: media-source://media_source/local/driveway_person_3.jpg
+              media_content_type: image/jpeg
+            - media_content_id: media-source://media_source/local/driveway_pet_1.jpg
+              media_content_type: image/jpeg
+            - media_content_id: media-source://media_source/local/driveway_pet_2.jpg
+              media_content_type: image/jpeg
+            - media_content_id: media-source://media_source/local/driveway_pet_3.jpg
+              media_content_type: image/jpeg
+          entity_id: ai_task.google_ai_task
+        response_variable: driveway_ai_response
+      # Store the driveway analysis result (extract only the first line)
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.driveway_analysis_result
+        data:
+          value: "{{ (driveway_ai_response.data | lower).split('\n')[0].strip() }}"
+      # Reset both image ready flags for next cycle
+      - service: input_boolean.turn_off
+        target:
+          entity_id: 
+            - input_boolean.person_images_ready
+            - input_boolean.pet_images_ready
   # Driveway Video AI Analysis
   - id: driveway_video_analysis
     alias: "Driveway Video AI Analysis"
@@ -203,25 +281,17 @@ automation:
                 data:
                   task_name: "driveway_walk_return_analysis"
                   instructions: >
-                    Analyze this 30-second driveway video captured during an active dog walk. A person was detected in the driveway while a walk was in progress, suggesting they may be returning from the walk.
-                    Since this was triggered during an active walk, focus specifically on:
-                    1. Is there a person returning to the house/driveway?
-                    2. Can you detect a dog with the person (even if partially obscured, on leash, or difficult to see due to lighting/positioning)?
-                    3. Does this appear to be the end of a dog walking activity?
-                    The dog may be:
-                    - Hard to see due to nighttime/low light conditions
-                    - Blocked or shielded by the person walking
-                    - Small and close to the person's legs
-                    - On the opposite side of the person from the camera
-                    Look carefully for:
-                    - Leash in person's hand or evidence of leash management
-                    - Person's walking pattern suggesting they're managing a dog
-                    - Any glimpse of dog movement, even if partial
-                    - Person entering property from street/sidewalk direction
-                    Respond with:
-                    - "ending_dog_walk" if there's evidence this is a person returning with a dog (even if dog is hard to see)
-                    - "person_only" if clearly only a person with no evidence of a dog
-                    - "unclear" if you cannot determine due to visibility issues
+                    Analyze the video for instances of a person walking a dog.
+                    Classify the activity as 'ending_dog_walk' if a person and their dog are
+                    observed moving from the street-facing side of the driveway up the driveway.
+                    Classify the activity as 'starting_dog_walk' if a person and their dog are
+                    observed moving down the driveway towards the street-facing side of the driveway.
+                    Respond with: - "starting_dog_walk" if person + dog are
+                    leaving for a walk - "ending_dog_walk" if person + dog are returning from a
+                    walk - "person_only" if only a person is seen - "dog_only" if only a dog
+                    is seen - "empty" if no relevant activity is detected Focus on clear dog
+                    walking activity and direction of travel.
+                    In a separate paragraph, explain your reasoning.
                   attachments:
                     - media_content_id: media-source://media_source/local/driveway_walk_return_capture.mp4
                       media_content_type: video/mp4
@@ -234,33 +304,28 @@ automation:
             data:
               task_name: "driveway_video_dog_walk_detection"
               instructions: >
-                Analyze this 30-second driveway video to detect dog walking activity. The video includes 15 seconds before the motion sensor triggered and 15 seconds after.
-                Look for:
-                1. A person walking with a dog (leash, person + dog movement together)
-                2. Direction of travel - are they leaving or arriving?
-                3. Dog walking behavior and person-dog interaction
-                Pay attention to the sequence of events throughout the video:
-                - If you see a person with a dog moving away from the camera/house or going down steps early in the video, this suggests "starting_dog_walk"
-                - If you see a person with a dog moving toward the camera/house or going up steps later in the video, this suggests "ending_dog_walk"
-                - Use the timestamp overlay to help determine the sequence and direction
-                Respond with:
-                - "starting_dog_walk" if person + dog are leaving for a walk
-                - "ending_dog_walk" if person + dog are returning from a walk  
-                - "person_only" if only a person is seen
-                - "dog_only" if only a dog is seen
-                - "empty" if no relevant activity is detected
-                Focus on clear dog walking activity and direction of travel. The 15-second lookback should capture the beginning of the activity that triggered the sensor.
+                Analyze the video for instances of a person walking a dog.
+                Classify the activity as 'ending_dog_walk' if a person and their dog are
+                observed moving from the street-facing side of the driveway up the driveway.
+                Classify the activity as 'starting_dog_walk' if a person and their dog are
+                observed moving down the driveway towards the street-facing side of the driveway.
+                Respond with: - "starting_dog_walk" if person + dog are
+                leaving for a walk - "ending_dog_walk" if person + dog are returning from a
+                walk - "person_only" if only a person is seen - "dog_only" if only a dog
+                is seen - "empty" if no relevant activity is detected Focus on clear dog
+                walking activity and direction of travel.
+                In a separate paragraph, explain your reasoning.
               attachments:
                 - media_content_id: media-source://media_source/local/driveway_dogwalk_capture.mp4
                   media_content_type: video/mp4
               entity_id: ai_task.google_ai_task
             response_variable: driveway_video_response
-      # Store the analysis result
+      # Store the analysis result (extract only the first line)
       - service: input_text.set_value
         target:
           entity_id: input_text.driveway_analysis_result
         data:
-          value: "{{ driveway_video_response.data | lower }}"
+          value: "{{ (driveway_video_response.data | lower).split('\n')[0].strip() }}"
       # Reset video ready flag for next cycle
       - service: input_boolean.turn_off
         target:
