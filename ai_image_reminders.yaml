@@ -2,7 +2,7 @@
 # Comprehensive Home Assistant package using AI Tasks and native automations
 # ADHD-focused image reminders for kitchen cleanliness, family room tidying, and dog walking
 #
-# Generated from modular components: 2025-08-25 20:07:54
+# Generated from modular components: 2025-08-25 20:19:27
 # Source: Modular components in src/
 #
 # Features:
@@ -522,6 +522,10 @@ automation:
       - condition: template
         value_template: >
           {{ states('input_text.family_room_camera_entity') not in ['unknown', ''] }}
+      # Check that AI task entity is available
+      - condition: template
+        value_template: >
+          {{ states('input_text.ai_task_entity') not in ['unknown', 'unavailable', ''] }}
       # Check if analysis is needed (based on time since last check or force check)
       - condition: or
         conditions:
@@ -747,6 +751,10 @@ automation:
       - condition: template
         value_template: >
           {{ states('input_text.kitchen_camera_entity') not in ['unknown', ''] }}
+      # Check that AI task entity is available
+      - condition: template
+        value_template: >
+          {{ states('input_text.ai_task_entity') not in ['unknown', 'unavailable', ''] }}
       # Check if analysis is needed (based on time since last check or force check)
       - condition: or
         conditions:

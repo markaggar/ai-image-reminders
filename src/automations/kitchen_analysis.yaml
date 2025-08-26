@@ -28,6 +28,10 @@
     - condition: template
       value_template: >
         {{ states('input_text.kitchen_camera_entity') not in ['unknown', ''] }}
+    # Check that AI task entity is available
+    - condition: template
+      value_template: >
+        {{ states('input_text.ai_task_entity') not in ['unknown', 'unavailable', ''] }}
     # Check if analysis is needed (based on time since last check or force check)
     - condition: or
       conditions:
