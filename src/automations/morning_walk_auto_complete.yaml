@@ -1,43 +1,84 @@
 # Mark morning walk as done when person detected with dog at driveway
 - id: morning_walk_auto_complete
-    alias: "Morning Walk Auto Complete"
-    description: "Automatically mark morning walk as complete when detected"
-    trigger:
-      - platform: state
-        entity_id: sensor.driveway_analysis
-        to: "person_with_dog"
-    condition:
-      - condition: time
-        after: "06:00:00"
-        before: "12:00:00"
-      - condition: state
-        entity_id: input_boolean.dog_walk_monitoring_enabled
-        state: "on"
-      # Check if morning walk not already done today
-      - condition: template
-        value_template: >
-          {% set morning_walk = states('input_datetime.morning_walk_done') %}
-          {% set today = now().strftime('%Y-%m-%d') %}
-          {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
-    action:
-      # Mark morning walk as done
-      - action: input_datetime.set_datetime
-        target:
-          entity_id: input_datetime.morning_walk_done
-        data:
-          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-      
-      # Clear morning walk notification
-      - service: notify.parents
-        data:
-          message: "clear_notification"
-          data:
-            tag: morning_dog_walk
-
-      # Send acknowledgment
-      - service: notify.parents
-        data:
-          title: "Morning Walk Complete! 🎉"
-          message: "Great job taking the dog for their morning walk!"
-          tag: morning_walk_complete
+  alias: "Morning Walk Auto Complete"
+  description: "Automatically mark morning walk as complete when detected (6am-3pm)"
+  trigger:
+    - platform: state
+      entity_id: sensor.driveway_analysis
+      to: "ending_dog_walk"
+  condition:
+    - condition: time
+      after: "06:00:00"
+      before: "15:00:00"
+    - condition: state
+      entity_id: input_boolean.dog_walk_monitoring_enabled
+      state: "on"
+    # Check if morning walk not already done today
+    - condition: template
+      value_template: >
+        {% set morning_walk = states('input_datetime.morning_walk_done') %}
+        {% set today = now().strftime('%Y-%m-%d') %}
+        {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
+  action:
+    # Clear walk in progress flag
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.walk_in_progress
+    
+    # Mark morning walk as done
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.morning_walk_done
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+    
+    # Clear morning walk notification for Liam
+    - event: UNotify
+      event_data_template:
+        message: "clear_notification"
+        message_target: liam
+        tag: morning_dog_walk
+    
+    # Clear walk started notification
+    - event: UNotify
+      event_data_template:
+        message: "clear_notification"
+        message_target: liam
+        tag: walk_started
+    
+    # Send encouraging acknowledgment to Liam
+    - event: UNotify
+      event_data_template:
+        message_speak: 'Awesome job taking the dog for a morning walk! You''re the best!'
+        message_display: 'Morning Walk Complete! 🎉'
+        message: >
+          Great job taking the dog for their morning walk! You''re awesome! 
+          {% set start_time = states('input_datetime.current_walk_started') %}
+          {% if start_time != 'unknown' %}
+            {% set duration = ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) %}
+            Walk duration: {{ duration }} minutes.
+          {% endif %} 🐕❤️
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: liam
+        tag: morning_walk_complete
+    
+    # Send completion status to parents
+    - event: UNotify
+      event_data_template:
+        message_speak: 'no'
+        message_display: 'no'
+        message: >
+          Morning walk completed at {{ now().strftime('%H:%M') }}.
+          {% set start_time = states('input_datetime.current_walk_started') %}
+          {% if start_time != 'unknown' %}
+            {% set duration = ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) %}
+            Duration: {{ duration }} minutes.
+          {% endif %}
+        priority: low
+        channel: General
+        aiprompt: 'no'
+        message_target: parents
+        tag: morning_walk_status
 

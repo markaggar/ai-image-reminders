@@ -2,7 +2,7 @@
 # Comprehensive Home Assistant package using AI Tasks and native automations
 # ADHD-focused image reminders for kitchen cleanliness, family room tidying, and dog walking
 #
-# Generated from modular components: 2025-08-23 22:29:38
+# Generated from modular components: 2025-08-25 17:54:19
 # Source: Modular components in src/
 #
 # Features:
@@ -40,11 +40,11 @@ template:
       name: "Family Room Analysis"
       unique_id: family_room_analysis_sensor
       state: >
-        {{ states('input_text.family_room_analysis_result') | default('unknown') }}
+        {{ states('sensor.family_room_tidy_status') | default(states('input_text.family_room_analysis_result')) | default('unknown') }}
       attributes:
         specific_tasks: >
-          {{ states('input_text.family_room_specific_tasks') | default('Set up AI Tasks integration for automated analysis') }}
-        last_updated: "{{ states('input_datetime.family_room_last_check') | default('never') }}"
+          {{ state_attr('sensor.family_room_tidy_status', 'tasks') | default(states('input_text.family_room_specific_tasks')) | default('Set up AI Tasks integration for automated analysis') }}
+        last_updated: "{{ state_attr('sensor.family_room_tidy_status', 'timestamp') | default(states('input_datetime.family_room_last_check')) | default('never') }}"
         threshold: "{{ states('input_number.family_room_cleanliness_threshold') }}%"
   
 # Kitchen Analysis Sensors
@@ -60,11 +60,11 @@ template:
       name: "Kitchen Analysis"
       unique_id: kitchen_analysis_sensor
       state: >
-        {{ states('input_text.kitchen_analysis_result') | default('unknown') }}
+        {{ states('sensor.kitchen_clean_status') | default(states('input_text.kitchen_analysis_result')) | default('unknown') }}
       attributes:
         specific_tasks: >
-          {{ states('input_text.kitchen_specific_tasks') | default('Set up AI Tasks integration for automated analysis') }}
-        last_updated: "{{ states('input_datetime.kitchen_last_check') | default('never') }}"
+          {{ state_attr('sensor.kitchen_clean_status', 'tasks') | default(states('input_text.kitchen_specific_tasks')) | default('Set up AI Tasks integration for automated analysis') }}
+        last_updated: "{{ state_attr('sensor.kitchen_clean_status', 'timestamp') | default(states('input_datetime.kitchen_last_check')) | default('never') }}"
         threshold: "{{ states('input_number.kitchen_cleanliness_threshold') }}%"
   
 # AI Detection Status and Driveway Sensors
@@ -118,218 +118,310 @@ template:
       attributes:
         last_updated: "{{ states('input_datetime.last_walk_detection') | default('never') }}"
         monitoring_active: "{{ is_state('input_boolean.dog_walk_monitoring_enabled', 'on') }}"
+        analysis_method: "video_based"
+        video_ready: "{{ is_state('input_boolean.driveway_video_ready', 'on') }}"
+  
+  - sensor:
+      name: "Walk Status"
+      unique_id: walk_status_sensor
+      state: >
+        {% if is_state('input_boolean.walk_in_progress', 'on') %}
+          in_progress
+        {% else %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {% set morning_walk = states('input_datetime.morning_walk_done') %}
+          {% set evening_walk = states('input_datetime.evening_walk_done') %}
+          {% set morning_done = morning_walk != 'unknown' and morning_walk[:10] == today %}
+          {% set evening_done = evening_walk != 'unknown' and evening_walk[:10] == today %}
+          
+          {% if morning_done and evening_done %}
+            both_complete
+          {% elif morning_done %}
+            morning_complete
+          {% elif evening_done %}
+            evening_complete
+          {% else %}
+            pending
+          {% endif %}
+        {% endif %}
+      attributes:
+        walk_in_progress: "{{ is_state('input_boolean.walk_in_progress', 'on') }}"
+        walk_started: "{{ states('input_datetime.current_walk_started') | default('never') }}"
+        walk_duration_minutes: >
+          {% if is_state('input_boolean.walk_in_progress', 'on') %}
+            {% set start_time = states('input_datetime.current_walk_started') %}
+            {% if start_time != 'unknown' %}
+              {{ ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) }}
+            {% else %}
+              unknown
+            {% endif %}
+          {% else %}
+            0
+          {% endif %}
+        morning_walk_done: "{{ states('input_datetime.morning_walk_done') | default('never') }}"
+        evening_walk_done: "{{ states('input_datetime.evening_walk_done') | default('never') }}"
+      icon: >
+        {% if is_state('sensor.walk_status', 'in_progress') %}
+          mdi:walk
+        {% elif is_state('sensor.walk_status', 'both_complete') %}
+          mdi:check-all
+        {% elif 'complete' in states('sensor.walk_status') %}
+          mdi:check
+        {% else %}
+          mdi:clock-outline
+        {% endif %}
   
 
 # Automations
 automation:
-# Driveway AI Analysis Automation
-- id: driveway_ai_analysis
-  alias: "Driveway AI Analysis"
-  description: "Analyze driveway images when both person and pet images are ready"
-  trigger:
-    - platform: state
-      entity_id: 
-        - input_boolean.person_images_ready
-        - input_boolean.pet_images_ready
-      to: "on"
-  condition:
-    - condition: state
-      entity_id: input_boolean.ai_detection_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.dog_walk_monitoring_enabled
-      state: "on"
-    # Both image sets must be ready
-    - condition: state
-      entity_id: input_boolean.person_images_ready
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.pet_images_ready
-      state: "on"
-    # Only analyze if camera entity is configured
-    - condition: template
-      value_template: >
-        {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
-  action:
-    # Update last detection time
-    - service: input_datetime.set_datetime
-      target:
-        entity_id: input_datetime.last_walk_detection
-      data:
-        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-    # Analyze all 6 images with AI Tasks
-    - service: ai_task.generate_data
-      data:
-        task_name: "driveway_person_dog_detection"
-        instructions: >
-          Analyze these driveway images captured from person motion (first 3) and pet motion (last 3). Look for:
-          1. A person walking with a dog
-          2. Person and dog together in the scene
-          3. Dog walking activity (leash, person + dog movement)
-          If you see a person with a dog, respond "person_with_dog".
-          If you see only a person, respond "person_only".
-          If you see only a dog, respond "dog_only".
-          If you see neither or just empty driveway, respond "empty".
-          Focus on detecting dog walking activity specifically.
-        attachments:
-          - media_content_id: media-source://media_source/local/driveway_person_1.jpg
-            media_content_type: image/jpeg
-          - media_content_id: media-source://media_source/local/driveway_person_2.jpg
-            media_content_type: image/jpeg
-          - media_content_id: media-source://media_source/local/driveway_person_3.jpg
-            media_content_type: image/jpeg
-          - media_content_id: media-source://media_source/local/driveway_pet_1.jpg
-            media_content_type: image/jpeg
-          - media_content_id: media-source://media_source/local/driveway_pet_2.jpg
-            media_content_type: image/jpeg
-          - media_content_id: media-source://media_source/local/driveway_pet_3.jpg
-            media_content_type: image/jpeg
-        entity_id: ai_task.google_ai_task
-      response_variable: driveway_ai_response
-    # Store the driveway analysis result
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.driveway_analysis_result
-      data:
-        value: "{{ driveway_ai_response.data | lower }}"
-    # Reset both image ready flags for next cycle
-    - service: input_boolean.turn_off
-      target:
-        entity_id: 
-          - input_boolean.person_images_ready
-          - input_boolean.pet_images_ready
-# Driveway Motion-Triggered Image Capture
-- id: driveway_image_capture
-  alias: "Driveway Motion Image Capture"
-  description: "Capture images when person or pet motion detected in driveway"
-  mode: parallel
-  trigger:
-    - platform: state
-      entity_id: binary_sensor.driveway_person
-      to: "on"
-      id: "person_motion"
-    - platform: state
-      entity_id: binary_sensor.driveway_pet  
-      to: "on"
-      id: "pet_motion"
-  condition:
-    - condition: state
-      entity_id: input_boolean.ai_detection_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.dog_walk_monitoring_enabled
-      state: "on"
-    # Only during hours when dog walks might happen
-    - condition: time
-      after: "06:00:00"
-      before: "22:00:00"
-    # Only analyze if camera entity is configured
-    - condition: template
-      value_template: >
-        {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
-  action:
-    - choose:
-        - conditions:
-            - condition: trigger
-              id: "person_motion"
-          sequence:
-            # Reset person images ready flag
-            - service: input_boolean.turn_off
-              target:
-                entity_id: input_boolean.person_images_ready
-            # Take 3 person images with delays
-            - service: camera.snapshot
-              target:
-                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-              data:
-                filename: "/config/www/local/driveway_person_1.jpg"
-            - delay: "00:00:05"
-            - service: camera.snapshot
-              target:
-                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-              data:
-                filename: "/config/www/local/driveway_person_2.jpg"
-            - delay: "00:00:05"
-            - service: camera.snapshot
-              target:
-                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-              data:
-                filename: "/config/www/local/driveway_person_3.jpg"
-            # Set person images ready flag
-            - service: input_boolean.turn_on
-              target:
-                entity_id: input_boolean.person_images_ready
-        - conditions:
-            - condition: trigger
-              id: "pet_motion"
-          sequence:
-            # Reset pet images ready flag
-            - service: input_boolean.turn_off
-              target:
-                entity_id: input_boolean.pet_images_ready
-            # Take 3 pet images with delays
-            - service: camera.snapshot
-              target:
-                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-              data:
-                filename: "/config/www/local/driveway_pet_1.jpg"
-            - delay: "00:00:05"
-            - service: camera.snapshot
-              target:
-                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-              data:
-                filename: "/config/www/local/driveway_pet_2.jpg"
-            - delay: "00:00:05"
-            - service: camera.snapshot
-              target:
-                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-              data:
-                filename: "/config/www/local/driveway_pet_3.jpg"
-            # Set pet images ready flag
-            - service: input_boolean.turn_on
-              target:
-                entity_id: input_boolean.pet_images_ready
-# Evening dog walk reminder
-- id: evening_dog_walk_reminder
-  alias: "Evening Dog Walk Reminder"
-description: "Remind to walk dog in the evening"
-trigger:
-  - platform: time
-    at: "17:00:00"
-  - platform: time
-    at: "17:30:00"
-  - platform: time
-    at: "18:00:00"
-condition:
-  - condition: state
-    entity_id: input_boolean.dog_walk_monitoring_enabled
-    state: "on"
-  - condition: state
-    entity_id: input_boolean.notifications_enabled
-    state: "on"
-  # Check if evening walk already done today
-  - condition: template
-    value_template: >
-      {% set evening_walk = states('input_datetime.evening_walk_done') %}
-      {% set today = now().strftime('%Y-%m-%d') %}
-      {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
-action:
-  - service: notify.parents
-    data:
-      title: "Time for Evening Dog Walk! 🐕"
-      message: "Don't forget to take the dog for their evening walk."
-      data:
-        tag: evening_dog_walk
-        message_speak: "yes"
-        message_display: "yes"
-# Mark evening walk as done when person detected with dog at driveway
-- id: evening_walk_auto_complete
+  # Driveway Video AI Analysis
+  - id: driveway_video_analysis
+    alias: "Driveway Video AI Analysis"
+    description: "Analyze driveway video to detect dog walking activity"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.driveway_video_ready
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.ai_detection_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+    action:
+      # Choose appropriate video file and analysis prompt based on walk status
+      - choose:
+          # Walk in progress - analyze return video for completion
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.walk_in_progress
+                state: "on"
+            sequence:
+              # Analyze the walk return video
+              - service: ai_task.generate_data
+                data:
+                  task_name: "driveway_walk_return_analysis"
+                  instructions: >
+                    Analyze this 30-second driveway video captured during an active dog walk. A person was detected in the driveway while a walk was in progress, suggesting they may be returning from the walk.
+                    Since this was triggered during an active walk, focus specifically on:
+                    1. Is there a person returning to the house/driveway?
+                    2. Can you detect a dog with the person (even if partially obscured, on leash, or difficult to see due to lighting/positioning)?
+                    3. Does this appear to be the end of a dog walking activity?
+                    The dog may be:
+                    - Hard to see due to nighttime/low light conditions
+                    - Blocked or shielded by the person walking
+                    - Small and close to the person's legs
+                    - On the opposite side of the person from the camera
+                    Look carefully for:
+                    - Leash in person's hand or evidence of leash management
+                    - Person's walking pattern suggesting they're managing a dog
+                    - Any glimpse of dog movement, even if partial
+                    - Person entering property from street/sidewalk direction
+                    Respond with:
+                    - "ending_dog_walk" if there's evidence this is a person returning with a dog (even if dog is hard to see)
+                    - "person_only" if clearly only a person with no evidence of a dog
+                    - "unclear" if you cannot determine due to visibility issues
+                  attachments:
+                    - media_content_id: media-source://media_source/local/driveway_walk_return_capture.mp4
+                      media_content_type: video/mp4
+                  entity_id: ai_task.google_ai_task
+                response_variable: driveway_video_response
+        # No walk in progress - use normal dual-sensor analysis
+        default:
+          # Analyze the standard dual-sensor triggered video
+          - service: ai_task.generate_data
+            data:
+              task_name: "driveway_video_dog_walk_detection"
+              instructions: >
+                Analyze this 30-second driveway video to detect dog walking activity. The video includes 15 seconds before the motion sensor triggered and 15 seconds after.
+                Look for:
+                1. A person walking with a dog (leash, person + dog movement together)
+                2. Direction of travel - are they leaving or arriving?
+                3. Dog walking behavior and person-dog interaction
+                Pay attention to the sequence of events throughout the video:
+                - If you see a person with a dog moving away from the camera/house or going down steps early in the video, this suggests "starting_dog_walk"
+                - If you see a person with a dog moving toward the camera/house or going up steps later in the video, this suggests "ending_dog_walk"
+                - Use the timestamp overlay to help determine the sequence and direction
+                Respond with:
+                - "starting_dog_walk" if person + dog are leaving for a walk
+                - "ending_dog_walk" if person + dog are returning from a walk  
+                - "person_only" if only a person is seen
+                - "dog_only" if only a dog is seen
+                - "empty" if no relevant activity is detected
+                Focus on clear dog walking activity and direction of travel. The 15-second lookback should capture the beginning of the activity that triggered the sensor.
+              attachments:
+                - media_content_id: media-source://media_source/local/driveway_dogwalk_capture.mp4
+                  media_content_type: video/mp4
+              entity_id: ai_task.google_ai_task
+            response_variable: driveway_video_response
+      # Store the analysis result
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.driveway_analysis_result
+        data:
+          value: "{{ driveway_video_response.data | lower }}"
+      # Reset video ready flag for next cycle
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.driveway_video_ready
+  # Driveway Video Capture for Walk Detection
+  - id: driveway_video_capture
+    alias: "Driveway Video Capture"
+    description: "Capture video when both person and pet motion detected in driveway within 30 seconds, OR when person detected during active walk"
+    mode: single
+    max_exceeded: silent
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.driveway_person
+        to: "on"
+        id: "person_motion"
+      - platform: state
+        entity_id: binary_sensor.driveway_pet  
+        to: "on"
+        id: "pet_motion"
+    condition:
+      # Only during hours when dog walks might happen
+      - condition: time
+        after: "06:00:00"
+        before: "22:00:00"
+      # Only analyze if camera entity is configured
+      - condition: template
+        value_template: >
+          {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
+    action:
+      # Check if this is a person detection during an active walk
+      - choose:
+          # Person detected during active walk - capture immediately for walk completion analysis
+          - conditions:
+              - condition: trigger
+                id: "person_motion"
+              - condition: state
+                entity_id: input_boolean.walk_in_progress
+                state: "on"
+            sequence:
+              # Update last detection time
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_walk_detection
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+              # Set video ready flag to false while capturing
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.driveway_video_ready
+              # Capture video for walk completion analysis
+              - service: camera.record
+                target:
+                  entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+                data:
+                  duration: 30
+                  lookback: 15
+                  filename: "/config/www/local/driveway_walk_return_capture.mp4"
+              # Wait for recording to complete
+              - delay: "00:00:32"
+              # Set video ready flag to trigger analysis
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.driveway_video_ready
+        # No active walk - use normal dual-sensor logic
+        default:
+          # Wait for both sensors to trigger within 30 seconds
+          - choose:
+              # If person triggered first, wait for pet
+              - conditions:
+                  - condition: trigger
+                    id: "person_motion"
+                sequence:
+                  - wait_for_trigger:
+                      - platform: state
+                        entity_id: binary_sensor.driveway_pet
+                        to: "on"
+                    timeout: "00:00:30"
+                    continue_on_timeout: false
+              # If pet triggered first, wait for person  
+              - conditions:
+                  - condition: trigger
+                    id: "pet_motion"
+                sequence:
+                  - wait_for_trigger:
+                      - platform: state
+                        entity_id: binary_sensor.driveway_person
+                        to: "on"
+                    timeout: "00:00:30"
+                    continue_on_timeout: false
+          # Both sensors detected - proceed with video capture
+          # Update last detection time
+          - service: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.last_walk_detection
+            data:
+              datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+          # Set video ready flag to false while capturing
+          - service: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.driveway_video_ready
+          # Capture video with 15 second lookback and 30 second duration
+          - service: camera.record
+            target:
+              entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+            data:
+              duration: 30
+              lookback: 15
+              filename: "/config/www/local/driveway_dogwalk_capture.mp4"
+          # Wait for recording to complete (30 seconds + small buffer)
+          - delay: "00:00:32"
+          # Set video ready flag to trigger analysis
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.driveway_video_ready
+  # Evening dog walk reminder
+  - id: evening_dog_walk_reminder
+    alias: "Evening Dog Walk Reminder"
+    description: "Remind to walk dog in the evening (8:30pm-10pm)"
+    trigger:
+      - platform: time
+        at: "20:30:00"
+      - platform: time
+        at: "21:00:00"
+      - platform: time
+        at: "21:30:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+      # Don't remind if walk is already in progress
+      - condition: state
+        entity_id: input_boolean.walk_in_progress
+        state: "off"
+      # Check if evening walk already done today
+      - condition: template
+        value_template: >
+          {% set evening_walk = states('input_datetime.evening_walk_done') %}
+          {% set today = now().strftime('%Y-%m-%d') %}
+          {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
+    action:
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Time for your evening dog walk! Don''t forget the leash!'
+          message_display: 'Evening Dog Walk Time 🐕'
+          message: 'Time for your evening dog walk! It''s {{ now().strftime(''%H:%M'') }} - grab the leash and have a great walk! 🐕'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
+          tag: evening_dog_walk
+  # Mark evening walk as done when person detected with dog at driveway
+  - id: evening_walk_auto_complete
     alias: "Evening Walk Auto Complete"
-    description: "Automatically mark evening walk as complete when detected"
+    description: "Automatically mark evening walk as complete when detected (3pm-10pm)"
     trigger:
       - platform: state
         entity_id: sensor.driveway_analysis
-        to: "person_with_dog"
+        to: "ending_dog_walk"
     condition:
       - condition: time
         after: "15:00:00"
@@ -344,183 +436,234 @@ action:
           {% set today = now().strftime('%Y-%m-%d') %}
           {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
     action:
+      # Clear walk in progress flag
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.walk_in_progress
       # Mark evening walk as done
       - action: input_datetime.set_datetime
         target:
           entity_id: input_datetime.evening_walk_done
         data:
           datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-      # Clear evening walk notification
-      - service: notify.parents
-        data:
+      # Clear evening walk notification for Liam
+      - event: UNotify
+        event_data_template:
           message: "clear_notification"
-          data:
-            tag: evening_dog_walk
-      # Send acknowledgment
-      - service: notify.parents
-        data:
-          title: "Evening Walk Complete! 🎉"
-          message: "Great job taking the dog for their evening walk!"
+          message_target: liam
+          tag: evening_dog_walk
+      # Clear walk started notification
+      - event: UNotify
+        event_data_template:
+          message: "clear_notification"
+          message_target: liam
+          tag: walk_started
+      # Send encouraging acknowledgment to Liam
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Excellent job taking the dog for an evening walk! You''re amazing!'
+          message_display: 'Evening Walk Complete! 🎉'
+          message: >
+            Great job taking the dog for their evening walk! You''re amazing! 
+            {% set start_time = states('input_datetime.current_walk_started') %}
+            {% if start_time != 'unknown' %}
+              {% set duration = ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) %}
+              Walk duration: {{ duration }} minutes.
+            {% endif %} 🐕❤️
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
           tag: evening_walk_complete
-# Family Room AI Analysis Automation
-- id: trigger_family_room_analysis
-  alias: "Trigger Family Room AI Analysis"
-  description: "Analyze family room tidiness when person motion detected"
-  trigger:
-    # Trigger when person motion turns on (person enters family room)
-    - platform: state
-      entity_id: binary_sensor.family_room_person_motion
-      to: "on"
-    # Trigger when person motion turns off (person leaves family room)
-    - platform: state
-      entity_id: binary_sensor.family_room_person_motion
-      to: "off" 
-      for:
-        minutes: 2  # Wait 2 minutes after person leaves to analyze
-    # Manual trigger via force check button
-    - platform: state
-      entity_id: input_boolean.force_family_room_check
-      to: "on"
-  condition:
-    - condition: state
-      entity_id: input_boolean.ai_detection_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.family_room_monitoring_enabled
-      state: "on"
-    # Only analyze if camera entity is configured
-    - condition: template
-      value_template: >
-        {{ states('input_text.family_room_camera_entity') not in ['unknown', ''] }}
-    # Check if analysis is needed (based on time since last check or force check)
-    - condition: or
-      conditions:
-        - condition: state
-          entity_id: input_boolean.force_family_room_check
-          state: "on"
-        - condition: template
-          value_template: >
-            {% set last_check = states('input_datetime.family_room_last_check') %}
-            {% if last_check == 'unknown' %}
-              true
-            {% else %}
-              {{ (as_timestamp(now()) - as_timestamp(last_check)) > 300 }}
+      # Send completion status to parents
+      - event: UNotify
+        event_data_template:
+          message_speak: 'no'
+          message_display: 'no'
+          message: >
+            Evening walk completed at {{ now().strftime('%H:%M') }}.
+            {% set start_time = states('input_datetime.current_walk_started') %}
+            {% if start_time != 'unknown' %}
+              {% set duration = ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) %}
+              Duration: {{ duration }} minutes.
             {% endif %}
-  action:
-    # Update last check time
-    - service: input_datetime.set_datetime
-      target:
-        entity_id: input_datetime.family_room_last_check
-      data:
-        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-    # Take camera snapshot and call AI Tasks to analyze family room
-    - service: camera.snapshot
-      target:
-        entity_id: "{{ states('input_text.family_room_camera_entity') }}"
-      data:
-        filename: "/config/www/local/family_room_snapshot.jpg"
-    - service: ai_task.generate_data
-      data:
-        task_name: "family_room_tidiness_analysis"
-        instructions: >
-          Analyze this family room/living room. Focus ONLY on practical safety and cleanliness.
-          Rate tidiness 0-100. If below {{ states('input_number.family_room_cleanliness_threshold') }}, 
-          respond "needs_tidying" and list issues. If above, respond "tidy".
-          ONLY flag these issues:
-          - Food/drinks left out (especially if sticky/messy)
-          - Dishes with food residue  
-          - Items on the floor (tripping hazard)
-          - Spills that need cleaning
-          IGNORE: blankets on chairs, remotes on tables, books/papers, decorative items, stuffed animals on furniture, charging cables
-        attachments:
-          - media_content_id: media-source://media_source/local/family_room_snapshot.jpg
-            media_content_type: image/jpeg
-        entity_id: ai_task.google_ai_task
-      response_variable: family_room_ai_response
-    # Store the main result - extract status from response
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.family_room_analysis_result
-      data:
-        value: >
-          {% set response = family_room_ai_response.data | lower %}
-          {% if 'needs_tidying' in response %}
-            needs_tidying
-          {% elif 'tidy' in response %}
-            tidy  
-          {% else %}
-            unknown
-          {% endif %}
-    # Get specific tasks
-    - service: ai_task.generate_data
-      data:
-        task_name: "family_room_specific_tasks"
-        instructions: >
-          Look at this family room. Create a brief, family-friendly list of important tasks only:
-          🍽️ DISHES: [plates, cups with food/drink to kitchen]
-          🧽 SPILLS: [sticky spots to wipe up]
-          🚶 FLOOR: [things on floor that could be tripped on]
-          Keep it simple for kids to understand. Skip categories with no real issues.
-          IGNORE: blankets, remotes, books, decorative items, toys on furniture.
-          Example: "🍽️ DISHES: cup with milk to kitchen"
-        attachments:
-          - media_content_id: media-source://media_source/local/family_room_snapshot.jpg
-            media_content_type: image/jpeg
-        entity_id: ai_task.google_ai_task
-      response_variable: family_room_tasks_response
-    # Store specific tasks
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.family_room_specific_tasks
-      data:
-        value: "{{ family_room_tasks_response.data | truncate(200) }}"
-    # Turn off force check trigger  
-    - service: input_boolean.turn_off
-      target:
+          priority: low
+          channel: General
+          aiprompt: 'no'
+          message_target: parents
+          tag: evening_walk_status
+  # Family Room AI Analysis Automation
+  - id: trigger_family_room_analysis
+    alias: "Trigger Family Room AI Analysis"
+    description: "Analyze family room tidiness when person motion detected"
+    trigger:
+      # Trigger when person motion turns on (person enters family room)
+      - platform: state
+        entity_id: binary_sensor.family_room_person_motion
+        to: "on"
+      # Trigger when person motion turns off (person leaves family room)
+      - platform: state
+        entity_id: binary_sensor.family_room_person_motion
+        to: "off" 
+        for:
+          minutes: 2  # Wait 2 minutes after person leaves to analyze
+      # Manual trigger via force check button
+      - platform: state
         entity_id: input_boolean.force_family_room_check
-# Family Room Tidying Notification
-- id: family_room_tidying_notification
-  alias: "Family Room Tidying Notification"
-  description: "Send notifications when family room needs tidying"
-  trigger:
-    - platform: state
-      entity_id: sensor.family_room_analysis
-      to: "needs_tidying"
-  condition:
-    - condition: state
-      entity_id: input_boolean.family_room_monitoring_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.notifications_enabled
-      state: "on"
-    # Check cooldown period
-    - condition: template
-      value_template: >
-        {% set last_notification = states('input_datetime.last_family_room_notification') %}
-        {% if last_notification == 'unknown' %}
-          true
-        {% else %}
-          {{ (as_timestamp(now()) - as_timestamp(last_notification)) / 60 > states('input_number.notification_cooldown') | int }}
-        {% endif %}
-  action:
-    # Update last notification time
-    - action: input_datetime.set_datetime
-      target:
-        entity_id: input_datetime.last_family_room_notification
-      data:
-        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-    # Send notification to parents
-    - service: notify.parents
-      data:
-        title: "Family Room Needs Tidying 🛋️"
-        message: >
-          When you get a chance, {{ state_attr('sensor.family_room_analysis', 'specific_tasks') | default('please tidy up the family room') | lower }}.
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.ai_detection_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.family_room_monitoring_enabled
+        state: "on"
+      # Only analyze if camera entity is configured
+      - condition: template
+        value_template: >
+          {{ states('input_text.family_room_camera_entity') not in ['unknown', ''] }}
+      # Check if analysis is needed (based on time since last check or force check)
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: input_boolean.force_family_room_check
+            state: "on"
+          - condition: template
+            value_template: >
+              {% set last_check = states('input_datetime.family_room_last_check') %}
+              {% if last_check == 'unknown' %}
+                true
+              {% else %}
+                {{ (as_timestamp(now()) - as_timestamp(last_check)) > 300 }}
+              {% endif %}
+    action:
+      # Update last check time
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.family_room_last_check
         data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      # Take camera snapshots for family room analysis
+      - service: camera.snapshot
+        target:
+          entity_id: "{{ states('input_text.family_room_camera_entity') }}"
+        data:
+          filename: "/config/www/local/family_room_snapshot.jpg"
+      # Take additional snapshot from kitchen camera (left side view into family room)
+      - service: camera.snapshot
+        target:
+          entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
+        data:
+          filename: "/config/www/local/family_room_kitchen_view_snapshot.jpg"
+      - service: ai_task.generate_data
+        data:
+          task_name: "family_room_tidiness_analysis"
+          instructions: >
+            Analyze these family room/living room images. Focus ONLY on practical safety and cleanliness.
+            Rate tidiness 0-100. If below {{ states('input_number.family_room_cleanliness_threshold') }}, 
+            respond "needs_tidying" and list issues. If above, respond "tidy".
+            Analysis of the family_room_kitchen_view_snapshot.jpg should exclude anything that is the kitchen. The family room is to the top left of the image, near the couch. If you see dirty dishes on the desk area between the kitchen and the family room, call that out too, but ignore the general clutter.
+            ONLY flag these issues:
+            - Food/drinks left out (especially if sticky/messy)
+            - Dishes with food residue  
+            - Items on the floor (tripping hazard)
+            - Spills that need cleaning
+            IGNORE: blankets on chairs, remotes on tables, books/papers, decorative items, stuffed animals on furniture, charging cables
+          attachments:
+            - media_content_id: media-source://media_source/local/family_room_snapshot.jpg
+              media_content_type: image/jpeg
+            - media_content_id: media-source://media_source/local/family_room_kitchen_view_snapshot.jpg
+              media_content_type: image/jpeg
+          entity_id: ai_task.google_ai_task
+        response_variable: family_room_ai_response
+      # Store analysis result and tasks in variable sensor
+      - service: variable.update_sensor
+        data:
+          value: >
+            {% set response = family_room_ai_response.data | lower %}
+            {% if 'needs_tidying' in response %}
+              needs_tidying
+            {% elif 'tidy' in response %}
+              tidy  
+            {% else %}
+              unknown
+            {% endif %}
+          attributes:
+            timestamp: "{{ now() }}"
+            tasks: >
+              {% set response = family_room_ai_response.data %}
+              {% set ns = namespace(filtered=[]) %}
+              {% for line in response.split('\n') %}
+                {% if not ('needs_tidying' in line.lower() or 'tidy' in line.lower()) %}
+                  {% set ns.filtered = ns.filtered + [line] %}
+                {% endif %}
+              {% endfor %}
+              {{ ns.filtered | join('\n') | trim }}
+          replace_attributes: true
+        target:
+          entity_id: sensor.family_room_tidy_status
+      # Also update the legacy input_text for backwards compatibility
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.family_room_analysis_result
+        data:
+          value: >
+            {% set response = family_room_ai_response.data | lower %}
+            {% if 'needs_tidying' in response %}
+              needs_tidying
+            {% elif 'tidy' in response %}
+              tidy  
+            {% else %}
+              unknown
+            {% endif %}
+      # Turn off force check trigger  
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.force_family_room_check
+  # Family Room Tidying Notification
+  - id: family_room_tidying_notification
+    alias: "Family Room Tidying Notification"
+    description: "Send notifications when family room needs tidying"
+    trigger:
+      - platform: state
+        entity_id: sensor.family_room_analysis
+        to: "needs_tidying"
+    condition:
+      - condition: state
+        entity_id: input_boolean.family_room_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+      # Check cooldown period
+      - condition: template
+        value_template: >
+          {% set last_notification = states('input_datetime.last_family_room_notification') %}
+          {% if last_notification == 'unknown' %}
+            true
+          {% else %}
+            {{ (as_timestamp(now()) - as_timestamp(last_notification)) / 60 > states('input_number.notification_cooldown') | int }}
+          {% endif %}
+    action:
+      # Update last notification time
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.last_family_room_notification
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      # Send reminder to Liam
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Hey Liam, the family room could use some tidying when you have a chance'
+          message_display: 'Family Room Needs Tidying 🛋️'
+          message: 'When you get a chance, {{ state_attr(''sensor.family_room_analysis'', ''specific_tasks'') | default(''please tidy up the family room'') | lower }}.'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
           tag: family_room_tidy
-          message_speak: "yes"
-          message_display: "yes"
-# Family room tidied acknowledgment
-- id: family_room_tidied_acknowledgment
+  # Family room tidied acknowledgment
+  - id: family_room_tidied_acknowledgment
     alias: "Family Room Tidied Acknowledgment"
     description: "Acknowledge when family room has been tidied"
     trigger:
@@ -533,23 +676,36 @@ action:
         entity_id: input_boolean.notifications_enabled
         state: "on"
     action:
-      # Clear the tidying notification
-      - service: notify.parents
-        data:
+      # Clear the tidying notification for Liam
+      - event: UNotify
+        event_data_template:
           message: "clear_notification"
-          data:
-            tag: family_room_tidy
-      # Send acknowledgment
-      - service: notify.parents
-        data:
-          title: "Family Room Tidy! ✨"
-          message: "Thanks for tidying up the family room! It looks great."
-          data:
-            tag: family_room_tidied
-            message_speak: "yes"
-            message_display: "yes"
-# Family room tidy notification
-- id: family_room_tidy_notification
+          message_target: liam
+          tag: family_room_tidy
+      # Send encouraging acknowledgment to Liam
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Fantastic job tidying the family room! You''re doing amazing!'
+          message_display: 'Family Room Tidy! ✨'
+          message: 'Thanks for tidying up the family room! It looks great - you''re amazing! 🌟'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
+          tag: family_room_tidied
+      # Send status update to parents
+      - event: UNotify
+        event_data_template:
+          message_speak: 'no'
+          message_display: 'no'
+          message: 'Family room tidied at {{ now().strftime(''%H:%M'') }} - excellent work!'
+          priority: low
+          channel: General
+          aiprompt: 'no'
+          message_target: parents
+          tag: family_room_status
+  # Family room tidy notification
+  - id: family_room_tidy_notification
     alias: "Family Room Tidy Notification"
     description: "Send notifications when family room is analyzed as tidy"
     trigger:
@@ -575,187 +731,226 @@ action:
           message: "The family room is nice and tidy. Great job keeping it organized!"
           data:
             tag: family_room_good
-# Kitchen AI Analysis Automation
-- id: trigger_kitchen_analysis
-  alias: "Trigger Kitchen AI Analysis"
-  description: "Analyze kitchen cleanliness when person motion detected"
-  trigger:
-    # Trigger when person motion turns on (person enters kitchen)
-    - platform: state
-      entity_id: binary_sensor.kitchen_person_motion
-      to: "on"
-    # Trigger when person motion turns off (person leaves kitchen)  
-    - platform: state
-      entity_id: binary_sensor.kitchen_person_motion
-      to: "off"
-      for:
-        minutes: 2  # Wait 2 minutes after person leaves to analyze
-    # Manual trigger via force check button
-    - platform: state
-      entity_id: input_boolean.force_kitchen_check
-      to: "on"
-  condition:
-    - condition: state
-      entity_id: input_boolean.ai_detection_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.kitchen_monitoring_enabled
-      state: "on"
-    # Only analyze if camera entity is configured
-    - condition: template
-      value_template: >
-        {{ states('input_text.kitchen_camera_entity') not in ['unknown', ''] }}
-    # Check if analysis is needed (based on time since last check or force check)
-    - condition: or
-      conditions:
-        - condition: state
-          entity_id: input_boolean.force_kitchen_check
-          state: "on"
-        - condition: template
-          value_template: >
-            {% set last_check = states('input_datetime.kitchen_last_check') %}
-            {% if last_check == 'unknown' %}
-              true
-            {% else %}
-              {{ (as_timestamp(now()) - as_timestamp(last_check)) > 300 }}
-            {% endif %}
-  action:
-    # Update last check time
-    - service: input_datetime.set_datetime
-      target:
-        entity_id: input_datetime.kitchen_last_check
-      data:
-        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-    # Take camera snapshot and call AI Tasks for kitchen analysis
-    - service: camera.snapshot
-      target:
-        entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
-      data:
-        filename: "/config/www/local/kitchen_snapshot.jpg"
-    - service: ai_task.generate_data
-      data:
-        task_name: "kitchen_cleanliness_analysis"
-        instructions: >
-          Analyze this kitchen image for food safety and basic cleanliness. Focus on:
-          1. Food items left out on counters (especially perishable items)
-          2. Dirty dishes in sink or on counters
-          3. Spills or messes that could attract pests
-          4. General tidiness that affects food preparation safety
-          Categorize as:
-          - "clean" if kitchen is suitable for food preparation
-          - "needs_attention" if there are minor issues (few dishes, small spills)
-          - "needs_cleaning" if there are food safety concerns (food left out, many dirty dishes, significant mess)
-          Be family-friendly and focus on health/safety rather than perfection.
-          Respond with just the category, then provide 2-3 specific helpful suggestions.
-        attachments:
-          - media_content_id: media-source://media_source/local/kitchen_snapshot.jpg
-            media_content_type: image/jpeg
-        entity_id: ai_task.google_ai_task
-      response_variable: kitchen_ai_response
-    # Parse and store analysis result
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.kitchen_analysis_result
-      data:
-        value: >
-          {% if 'clean' in kitchen_ai_response.data | lower %}
-            clean
-          {% elif 'needs_cleaning' in kitchen_ai_response.data | lower %}
-            needs_cleaning
-          {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
-            needs_attention
-          {% else %}
-            unknown
-          {% endif %}
-    # Store specific tasks/suggestions
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.kitchen_specific_tasks
-      data:
-        value: "{{ kitchen_ai_response.data }}"
-    # Turn off force check trigger  
-    - service: input_boolean.turn_off
-      target:
+  # Kitchen AI Analysis Automation
+  - id: trigger_kitchen_analysis
+    alias: "Trigger Kitchen AI Analysis"
+    description: "Analyze kitchen cleanliness when person motion detected"
+    trigger:
+      # Trigger when person motion turns on (person enters kitchen)
+      - platform: state
+        entity_id: binary_sensor.kitchen_person_motion
+        to: "on"
+      # Trigger when person motion turns off (person leaves kitchen)  
+      - platform: state
+        entity_id: binary_sensor.kitchen_person_motion
+        to: "off"
+        for:
+          minutes: 2  # Wait 2 minutes after person leaves to analyze
+      # Manual trigger via force check button
+      - platform: state
         entity_id: input_boolean.force_kitchen_check
-# Kitchen Cleaned Acknowledgment
-- id: kitchen_cleaned_acknowledgment
-  alias: "Kitchen Cleaned Acknowledgment"
-  description: "Acknowledge when kitchen has been cleaned"
-  trigger:
-    - platform: state
-      entity_id: sensor.kitchen_analysis
-      from: "needs_cleaning"
-      to: "clean"
-  condition:
-    - condition: state
-      entity_id: input_boolean.notifications_enabled
-      state: "on"
-  action:
-    # Clear the cleanup notification
-    - service: notify.parents
-      data:
-        message: "clear_notification"
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.ai_detection_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.kitchen_monitoring_enabled
+        state: "on"
+      # Only analyze if camera entity is configured
+      - condition: template
+        value_template: >
+          {{ states('input_text.kitchen_camera_entity') not in ['unknown', ''] }}
+      # Check if analysis is needed (based on time since last check or force check)
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: input_boolean.force_kitchen_check
+            state: "on"
+          - condition: template
+            value_template: >
+              {% set last_check = states('input_datetime.kitchen_last_check') %}
+              {% if last_check == 'unknown' %}
+                true
+              {% else %}
+                {{ (as_timestamp(now()) - as_timestamp(last_check)) > 300 }}
+              {% endif %}
+    action:
+      # Update last check time
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.kitchen_last_check
         data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      # Take camera snapshots for kitchen analysis
+      - service: camera.snapshot
+        target:
+          entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
+        data:
+          filename: "/config/www/local/kitchen_snapshot.jpg"
+      # Fire tablet camera temporarily disabled due to Fully Kiosk integration issues
+      # TODO: Re-enable when fire tablet camera is stable
+      - service: ai_task.generate_data
+        data:
+          task_name: "kitchen_cleanliness_analysis"
+          instructions: >
+            Analyze this kitchen image for food safety and basic cleanliness. Focus on:
+            1. Food items left out on counters (especially perishable items)
+            2. Dirty dishes in sink or on counters
+            3. Spills or messes that could attract pests
+            4. General tidiness that affects food preparation safety
+            Categorize as:
+            - "clean" if kitchen is suitable for food preparation
+            - "needs_attention" if there are minor issues (few dishes, small spills)
+            - "needs_cleaning" if there are food safety concerns (food left out, many dirty dishes, significant mess)
+            Be family-friendly and focus on health/safety rather than perfection.
+            Respond with just the category, then provide 2-3 specific helpful suggestions.
+          attachments:
+            - media_content_id: media-source://media_source/local/kitchen_snapshot.jpg
+              media_content_type: image/jpeg
+          entity_id: ai_task.google_ai_task
+        response_variable: kitchen_ai_response
+      # Store analysis result and tasks in variable sensor
+      - service: variable.update_sensor
+        data:
+          value: >
+            {% if 'needs_cleaning' in kitchen_ai_response.data | lower %}
+              needs_cleaning
+            {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
+              needs_attention
+            {% elif 'clean' in kitchen_ai_response.data | lower %}
+              clean
+            {% else %}
+              unknown
+            {% endif %}
+          attributes:
+            timestamp: "{{ now() }}"
+            tasks: >
+              {% set response = kitchen_ai_response.data %}
+              {% set ns = namespace(filtered=[]) %}
+              {% for line in response.split('\n') %}
+                {% if not ('needs_cleaning' in line.lower() or 'needs_attention' in line.lower() or 'clean' in line.lower()) %}
+                  {% set ns.filtered = ns.filtered + [line] %}
+                {% endif %}
+              {% endfor %}
+              {{ ns.filtered | join('\n') | trim }}
+          replace_attributes: true
+        target:
+          entity_id: sensor.kitchen_clean_status
+      # Also update the legacy input_text for backwards compatibility
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.kitchen_analysis_result
+        data:
+          value: >
+            {% if 'needs_cleaning' in kitchen_ai_response.data | lower %}
+              needs_cleaning
+            {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
+              needs_attention
+            {% elif 'clean' in kitchen_ai_response.data | lower %}
+              clean
+            {% else %}
+              unknown
+            {% endif %}
+      # Turn off force check trigger  
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.force_kitchen_check
+  # Kitchen Cleaned Acknowledgment
+  - id: kitchen_cleaned_acknowledgment
+    alias: "Kitchen Cleaned Acknowledgment"
+    description: "Acknowledge when kitchen has been cleaned"
+    trigger:
+      - platform: state
+        entity_id: sensor.kitchen_analysis
+        from: "needs_cleaning"
+        to: "clean"
+    condition:
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+    action:
+      # Clear the cleanup notification for Liam
+      - event: UNotify
+        event_data_template:
+          message: "clear_notification"
+          message_target: liam
           tag: kitchen_cleanup
-    # Send acknowledgment
-    - service: notify.parents
-      data:
-        title: "Kitchen Clean! ✨"
-        message: "Great job cleaning up the kitchen! It looks fantastic."
-        data:
+      # Send encouraging acknowledgment to Liam
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Awesome job cleaning the kitchen! You''re doing great!'
+          message_display: 'Kitchen Clean! ✨'
+          message: 'Great job cleaning up the kitchen! It looks fantastic - you''re awesome! 🌟'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
           tag: kitchen_cleaned
-          message_speak: "yes"
-          message_display: "yes"
-# Kitchen Cleanup Notification
-- id: kitchen_cleanup_notification
-  alias: "Kitchen Cleanup Notification"
-  description: "Send notifications when kitchen needs cleaning"
-  trigger:
-    - platform: state
-      entity_id: sensor.kitchen_analysis
-      to: "needs_cleaning"
-  condition:
-    - condition: state
-      entity_id: input_boolean.kitchen_monitoring_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.notifications_enabled
-      state: "on"
-    # Check 30-minute cooldown period
-    - condition: template
-      value_template: >
-        {% set last_notification = states('input_datetime.last_kitchen_notification') %}
-        {% if last_notification == 'unknown' %}
-          true
-        {% else %}
-          {{ (as_timestamp(now()) - as_timestamp(last_notification)) / 60 > states('input_number.notification_cooldown') | int }}
-        {% endif %}
-  action:
-    # Update last notification time
-    - action: input_datetime.set_datetime
-      target:
-        entity_id: input_datetime.last_kitchen_notification
-      data:
-        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-    # Send notification to parents
-    - service: notify.parents
-      data:
-        title: "Kitchen Needs Cleaning 🍽️"
-        message: >
-          Hey, when you're done in the kitchen, {{ state_attr('sensor.kitchen_analysis', 'specific_tasks') | default('please tidy up a bit') | lower }}.
+      # Send status update to parents
+      - event: UNotify
+        event_data_template:
+          message_speak: 'no'
+          message_display: 'no'
+          message: 'Kitchen cleaned at {{ now().strftime(''%H:%M'') }} - great work!'
+          priority: low
+          channel: General
+          aiprompt: 'no'
+          message_target: parents
+          tag: kitchen_status
+  # Kitchen Cleanup Notification
+  - id: kitchen_cleanup_notification
+    alias: "Kitchen Cleanup Notification"
+    description: "Send notifications when kitchen needs cleaning"
+    trigger:
+      - platform: state
+        entity_id: sensor.kitchen_analysis
+        to: "needs_cleaning"
+    condition:
+      - condition: state
+        entity_id: input_boolean.kitchen_monitoring_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.notifications_enabled
+        state: "on"
+      # Check 30-minute cooldown period
+      - condition: template
+        value_template: >
+          {% set last_notification = states('input_datetime.last_kitchen_notification') %}
+          {% if last_notification == 'unknown' %}
+            true
+          {% else %}
+            {{ (as_timestamp(now()) - as_timestamp(last_notification)) / 60 > states('input_number.notification_cooldown') | int }}
+          {% endif %}
+    action:
+      # Update last notification time
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.last_kitchen_notification
         data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      # Send reminder to Liam
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Hey Liam, the kitchen needs some attention when you have a moment'
+          message_display: 'Kitchen Needs Cleaning 🍽️'
+          message: 'Hey, when you''re done in the kitchen, {{ state_attr(''sensor.kitchen_analysis'', ''specific_tasks'') | default(''please tidy up a bit'') | lower }}.'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
           tag: kitchen_cleanup
-# Morning dog walk reminder
-- id: morning_dog_walk_reminder
+  # Morning dog walk reminder
+  - id: morning_dog_walk_reminder
     alias: "Morning Dog Walk Reminder"
-    description: "Remind to walk dog in the morning"
+    description: "Remind to walk dog in the morning/afternoon (12pm-3pm)"
     trigger:
       - platform: time
-        at: "08:00:00"
+        at: "12:00:00"
       - platform: time
-        at: "08:30:00"
+        at: "12:30:00"
       - platform: time
-        at: "09:00:00"
+        at: "13:00:00"
     condition:
       - condition: state
         entity_id: input_boolean.dog_walk_monitoring_enabled
@@ -763,6 +958,10 @@ action:
       - condition: state
         entity_id: input_boolean.notifications_enabled
         state: "on"
+      # Don't remind if walk is already in progress
+      - condition: state
+        entity_id: input_boolean.walk_in_progress
+        state: "off"
       # Check if morning walk already done today
       - condition: template
         value_template: >
@@ -770,26 +969,28 @@ action:
           {% set today = now().strftime('%Y-%m-%d') %}
           {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
     action:
-      - service: notify.parents
-        data:
-          title: "Time for Morning Dog Walk! 🐕"
-          message: "Don't forget to take the dog for their morning walk."
-          data:
-            tag: morning_dog_walk
-            message_speak: "yes"
-            message_display: "yes"
-# Mark morning walk as done when person detected with dog at driveway
-- id: morning_walk_auto_complete
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Time for your morning dog walk! Don''t forget the leash!'
+          message_display: 'Morning Dog Walk Time 🐕'
+          message: 'Time for your morning dog walk! It''s {{ now().strftime(''%H:%M'') }} - grab the leash and have a great walk! 🐕'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
+          tag: morning_dog_walk
+  # Mark morning walk as done when person detected with dog at driveway
+  - id: morning_walk_auto_complete
     alias: "Morning Walk Auto Complete"
-    description: "Automatically mark morning walk as complete when detected"
+    description: "Automatically mark morning walk as complete when detected (6am-3pm)"
     trigger:
       - platform: state
         entity_id: sensor.driveway_analysis
-        to: "person_with_dog"
+        to: "ending_dog_walk"
     condition:
       - condition: time
         after: "06:00:00"
-        before: "12:00:00"
+        before: "15:00:00"
       - condition: state
         entity_id: input_boolean.dog_walk_monitoring_enabled
         state: "on"
@@ -800,229 +1001,496 @@ action:
           {% set today = now().strftime('%Y-%m-%d') %}
           {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
     action:
+      # Clear walk in progress flag
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.walk_in_progress
       # Mark morning walk as done
       - action: input_datetime.set_datetime
         target:
           entity_id: input_datetime.morning_walk_done
         data:
           datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-      # Clear morning walk notification
-      - service: notify.parents
-        data:
+      # Clear morning walk notification for Liam
+      - event: UNotify
+        event_data_template:
           message: "clear_notification"
-          data:
-            tag: morning_dog_walk
-      # Send acknowledgment
-      - service: notify.parents
-        data:
-          title: "Morning Walk Complete! 🎉"
-          message: "Great job taking the dog for their morning walk!"
+          message_target: liam
+          tag: morning_dog_walk
+      # Clear walk started notification
+      - event: UNotify
+        event_data_template:
+          message: "clear_notification"
+          message_target: liam
+          tag: walk_started
+      # Send encouraging acknowledgment to Liam
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Awesome job taking the dog for a morning walk! You''re the best!'
+          message_display: 'Morning Walk Complete! 🎉'
+          message: >
+            Great job taking the dog for their morning walk! You''re awesome! 
+            {% set start_time = states('input_datetime.current_walk_started') %}
+            {% if start_time != 'unknown' %}
+              {% set duration = ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) %}
+              Walk duration: {{ duration }} minutes.
+            {% endif %} 🐕❤️
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
           tag: morning_walk_complete
+      # Send completion status to parents
+      - event: UNotify
+        event_data_template:
+          message_speak: 'no'
+          message_display: 'no'
+          message: >
+            Morning walk completed at {{ now().strftime('%H:%M') }}.
+            {% set start_time = states('input_datetime.current_walk_started') %}
+            {% if start_time != 'unknown' %}
+              {% set duration = ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) %}
+              Duration: {{ duration }} minutes.
+            {% endif %}
+          priority: low
+          channel: General
+          aiprompt: 'no'
+          message_target: parents
+          tag: morning_walk_status
+  # Handle unclear walk return analysis
+  - id: unclear_walk_return_notification
+    alias: "Unclear Walk Return Notification"
+    description: "Notify user when walk return analysis is unclear during active walk"
+    trigger:
+      - platform: state
+        entity_id: sensor.driveway_analysis
+        to: "unclear"
+    condition:
+      # Only trigger if a walk is in progress
+      - condition: state
+        entity_id: input_boolean.walk_in_progress
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+    action:
+      # Send notification asking for manual confirmation (to parents for oversight)
+      - event: UNotify
+        event_data_template:
+          message_speak: 'no'
+          message_display: 'no'
+          message: 'Someone returned to the driveway during the walk, but I couldn''t clearly see if the dog was with them due to lighting or positioning. Did the walk just finish?'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: parents
+          tag: unclear_walk_return
+          actions:
+            - action: "confirm_walk_complete"
+              title: "Yes, Walk Complete ✅"
+            - action: "walk_still_ongoing"
+              title: "No, Still Walking 🚶‍♂️"
+  # Handle user response to unclear walk return
+  - id: handle_unclear_walk_response
+    alias: "Handle Unclear Walk Response"
+    description: "Process user's response to unclear walk return notification"
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "confirm_walk_complete"
+        id: "walk_complete"
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "walk_still_ongoing"
+        id: "still_walking"
+    condition:
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+    action:
+      # Clear the unclear walk notification first
+      - event: UNotify
+        event_data_template:
+          message: "clear_notification"
+          message_target: parents
+          tag: unclear_walk_return
+      - choose:
+          # User confirmed walk is complete
+          - conditions:
+              - condition: trigger
+                id: "walk_complete"
+            sequence:
+              # Clear walk in progress flag
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.walk_in_progress
+              # Determine time of day and mark appropriate walk complete
+              - choose:
+                  # Morning time (6am-3pm)
+                  - conditions:
+                      - condition: time
+                        after: "06:00:00"
+                        before: "15:00:00"
+                    sequence:
+                      # Check if morning walk not already done
+                      - condition: template
+                        value_template: >
+                          {% set morning_walk = states('input_datetime.morning_walk_done') %}
+                          {% set today = now().strftime('%Y-%m-%d') %}
+                          {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
+                      # Mark morning walk complete
+                      - action: input_datetime.set_datetime
+                        target:
+                          entity_id: input_datetime.morning_walk_done
+                        data:
+                          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+                      # Clear morning walk notifications for Liam
+                      - event: UNotify
+                        event_data_template:
+                          message: "clear_notification"
+                          message_target: liam
+                          tag: morning_dog_walk
+                      # Send encouraging acknowledgment to Liam
+                      - event: UNotify
+                        event_data_template:
+                          message_speak: 'Awesome job with the morning walk! You''re the best!'
+                          message_display: 'Morning Walk Complete! 🐕❤️'
+                          message: 'Thanks for walking the dog! Morning walk marked as complete - you''re amazing!'
+                          priority: normal
+                          channel: General
+                          aiprompt: 'no'
+                          message_target: liam
+                          tag: walk_acknowledgment
+                  # Evening time (3pm-10pm)
+                  - conditions:
+                      - condition: time
+                        after: "15:00:00" 
+                        before: "22:00:00"
+                    sequence:
+                      # Check if evening walk not already done
+                      - condition: template
+                        value_template: >
+                          {% set evening_walk = states('input_datetime.evening_walk_done') %}
+                          {% set today = now().strftime('%Y-%m-%d') %}
+                          {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
+                      # Mark evening walk complete
+                      - action: input_datetime.set_datetime
+                        target:
+                          entity_id: input_datetime.evening_walk_done
+                        data:
+                          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+                      # Clear evening walk notifications for Liam
+                      - event: UNotify
+                        event_data_template:
+                          message: "clear_notification"
+                          message_target: liam
+                          tag: evening_dog_walk
+                      # Send encouraging acknowledgment to Liam
+                      - event: UNotify
+                        event_data_template:
+                          message_speak: 'Excellent job with the evening walk! You''re amazing!'
+                          message_display: 'Evening Walk Complete! 🐕❤️'
+                          message: 'Thanks for walking the dog! Evening walk marked as complete - you''re amazing!'
+                          priority: normal
+                          channel: General
+                          aiprompt: 'no'
+                          message_target: liam
+                          tag: walk_acknowledgment
+          # User said walk is still ongoing
+          - conditions:
+              - condition: trigger
+                id: "still_walking"
+            sequence:
+              # Send acknowledgment that walk continues (to parents for status)
+              - event: UNotify
+                event_data_template:
+                  message_speak: 'no'
+                  message_display: 'no'
+                  message: 'Got it! Walk marked as still in progress. I''ll keep monitoring for the return.'
+                  priority: low
+                  channel: General
+                  aiprompt: 'no'
+                  message_target: parents
+                  tag: walk_acknowledgment
+  # Walk Started Detection
+  - id: walk_started_detection
+    alias: "Walk Started Detection"
+    description: "Detect when someone starts a dog walk and clear reminders"
+    trigger:
+      - platform: state
+        entity_id: sensor.driveway_analysis
+        to: "starting_dog_walk"
+    condition:
+      - condition: state
+        entity_id: input_boolean.dog_walk_monitoring_enabled
+        state: "on"
+      # Only trigger if not already on a walk
+      - condition: state
+        entity_id: input_boolean.walk_in_progress
+        state: "off"
+    action:
+      # Set walk in progress flag
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.walk_in_progress
+      # Record walk start time
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.current_walk_started
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      # Clear any active walk reminder notifications for Liam
+      - event: UNotify
+        event_data_template:
+          message: "clear_notification"
+          message_target: liam
+          tag: morning_dog_walk
+      - event: UNotify
+        event_data_template:
+          message: "clear_notification"
+          message_target: liam
+          tag: evening_dog_walk
+      # Send encouraging walk started notification to Liam
+      - event: UNotify
+        event_data_template:
+          message_speak: 'Great! You''re taking the dog for a walk - have a wonderful time!'
+          message_display: 'Walk Started! 🚶‍♂️🐕'
+          message: 'Awesome! You''re taking the dog for a walk - have a great time together! 🐕❤️'
+          priority: normal
+          channel: General
+          aiprompt: 'no'
+          message_target: liam
+          tag: walk_started
+      # Send status update to parents
+      - event: UNotify
+        event_data_template:
+          message_speak: 'no'
+          message_display: 'no'
+          message: 'Dog walk started at {{ now().strftime(''%H:%M'') }}.'
+          priority: low
+          channel: General
+          aiprompt: 'no'
+          message_target: parents
+          tag: walk_started_status
 
 # Input Boolean Helpers
 input_boolean:
-# Input Boolean Helper Entities
-ai_detection_enabled:
-  name: "AI Detection System Enabled"
-  icon: mdi:brain
+  # Input Boolean Helper Entities
+  ai_detection_enabled:
+    name: "AI Detection System Enabled"
+    icon: mdi:brain
 
-notifications_enabled:
-  name: "Notifications Enabled"
-  icon: mdi:bell
+  notifications_enabled:
+    name: "Notifications Enabled"
+    icon: mdi:bell
 
-kitchen_monitoring_enabled:
-  name: "Kitchen Monitoring Enabled" 
-  icon: mdi:chef-hat
+  kitchen_monitoring_enabled:
+    name: "Kitchen Monitoring Enabled" 
+    icon: mdi:chef-hat
 
-family_room_monitoring_enabled:
-  name: "Family Room Monitoring Enabled"
-  icon: mdi:sofa
+  family_room_monitoring_enabled:
+    name: "Family Room Monitoring Enabled"
+    icon: mdi:sofa
 
-dog_walk_monitoring_enabled:
-  name: "Dog Walk Monitoring Enabled"
-  icon: mdi:dog
+  dog_walk_monitoring_enabled:
+    name: "Dog Walk Monitoring Enabled"
+    icon: mdi:dog
 
-dog_walk_reminders_enabled:
-  name: "Dog Walk Reminders Enabled"
-  icon: mdi:dog
+  dog_walk_reminders_enabled:
+    name: "Dog Walk Reminders Enabled"
+    icon: mdi:dog
 
-force_kitchen_check:
-  name: "Force Kitchen Check"
-  icon: mdi:camera-iris
+  walk_in_progress:
+    name: "Walk In Progress"
+    icon: mdi:walk
 
-force_family_room_check:
-  name: "Force Family Room Check" 
-  icon: mdi:camera-iris
+  force_kitchen_check:
+    name: "Force Kitchen Check"
+    icon: mdi:camera-iris
 
-person_images_ready:
-  name: "Person Images Ready"
-  icon: mdi:account-check
-  
-pet_images_ready:
-  name: "Pet Images Ready"
-  icon: mdi:dog
+  force_family_room_check:
+    name: "Force Family Room Check" 
+    icon: mdi:camera-iris
+
+  driveway_video_ready:
+    name: "Driveway Video Ready"
+    icon: mdi:video-check
 
 
 # Input DateTime Helpers
 input_datetime:
-# Input DateTime Helper Entities
-kitchen_last_check:
-  name: "Kitchen Last Check"
-  has_date: true
-  has_time: true
-  icon: mdi:clock-check
-  
-last_kitchen_notification:
-  name: "Last Kitchen Notification"
-  has_date: true
-  has_time: true
-  icon: mdi:bell-check
-  
-family_room_last_check:
-  name: "Family Room Last Check"
-  has_date: true
-  has_time: true
-  icon: mdi:clock-check
-  
-last_family_room_notification:
-  name: "Last Family Room Notification"
-  has_date: true
-  has_time: true
-  icon: mdi:bell-check
-  
-morning_walk_done:
-  name: "Morning Walk Done"
-  has_date: true
-  has_time: true
-  icon: mdi:dog
-  
-evening_walk_done:
-  name: "Evening Walk Done"
-  has_date: true
-  has_time: true
-  icon: mdi:dog
-  
-last_walk_detection:
-  name: "Last Walk Detection"
-  has_date: true
-  has_time: true
-  icon: mdi:camera-timer
-  
-last_dog_notification:
-  name: "Last Dog Notification"
-  has_date: true
-  has_time: true
-  icon: mdi:bell-check
+  # Input DateTime Helper Entities
+  kitchen_last_check:
+    name: "Kitchen Last Check"
+    has_date: true
+    has_time: true
+    icon: mdi:clock-check
+    
+  last_kitchen_notification:
+    name: "Last Kitchen Notification"
+    has_date: true
+    has_time: true
+    icon: mdi:bell-check
+    
+  family_room_last_check:
+    name: "Family Room Last Check"
+    has_date: true
+    has_time: true
+    icon: mdi:clock-check
+    
+  last_family_room_notification:
+    name: "Last Family Room Notification"
+    has_date: true
+    has_time: true
+    icon: mdi:bell-check
+    
+  morning_walk_done:
+    name: "Morning Walk Done"
+    has_date: true
+    has_time: true
+    icon: mdi:dog
+    
+  evening_walk_done:
+    name: "Evening Walk Done"
+    has_date: true
+    has_time: true
+    icon: mdi:dog
+    
+  current_walk_started:
+    name: "Current Walk Started"
+    has_date: true
+    has_time: true
+    icon: mdi:clock-start
+    
+  last_walk_detection:
+    name: "Last Walk Detection"
+    has_date: true
+    has_time: true
+    icon: mdi:camera-timer
+    
+  last_dog_notification:
+    name: "Last Dog Notification"
+    has_date: true
+    has_time: true
+    icon: mdi:bell-check
 
 
 # Input Number Helpers
 input_number:
-# Input Number Helper Entities
-kitchen_cleanliness_threshold:
-  name: "Kitchen Cleanliness Threshold"
-  min: 1
-  max: 100
-  step: 1
-  initial: 70
-  unit_of_measurement: "%"
-  icon: mdi:gauge
-  
-family_room_cleanliness_threshold:
-  name: "Family Room Cleanliness Threshold"
-  min: 1
-  max: 100
-  step: 1
-  initial: 65
-  unit_of_measurement: "%"
-  icon: mdi:gauge
-  
-notification_cooldown:
-  name: "Notification Cooldown"
-  min: 10
-  max: 240
-  step: 5
-  initial: 30
-  unit_of_measurement: "minutes"
-  icon: mdi:timer
-  
-dog_walk_max_hours:
-  name: "Dog Walk Max Hours"
-  min: 4
-  max: 16
-  step: 1
-  initial: 8
-  unit_of_measurement: "hours"
-  icon: mdi:clock
+  # Input Number Helper Entities
+  kitchen_cleanliness_threshold:
+    name: "Kitchen Cleanliness Threshold"
+    min: 1
+    max: 100
+    step: 1
+    initial: 70
+    unit_of_measurement: "%"
+    icon: mdi:gauge
+    
+  family_room_cleanliness_threshold:
+    name: "Family Room Cleanliness Threshold"
+    min: 1
+    max: 100
+    step: 1
+    initial: 65
+    unit_of_measurement: "%"
+    icon: mdi:gauge
+    
+  notification_cooldown:
+    name: "Notification Cooldown"
+    min: 10
+    max: 240
+    step: 5
+    initial: 30
+    unit_of_measurement: "minutes"
+    icon: mdi:timer
+    
+  dog_walk_max_hours:
+    name: "Dog Walk Max Hours"
+    min: 4
+    max: 16
+    step: 1
+    initial: 8
+    unit_of_measurement: "hours"
+    icon: mdi:clock
 
 
 # Input Text Helpers
 input_text:
-# Input Text Helper Entities
-parents_notification_service:
-  name: "Parents Notification Service"
-  initial: "notify.parents"
-  max: 100
-  icon: mdi:account-group
+  # Input Text Helper Entities
+  parents_notification_service:
+    name: "Parents Notification Service"
+    initial: "notify.parents"
+    max: 100
+    icon: mdi:account-group
 
-kitchen_camera_entity:
-  name: "Kitchen Camera Entity"
-  initial: "camera.kitchen"
-  max: 100
-  icon: mdi:camera
+  kitchen_camera_entity:
+    name: "Kitchen Camera Entity"
+    initial: "camera.kitchen"
+    max: 100
+    icon: mdi:camera
 
-family_room_camera_entity:
-  name: "Family Room Camera Entity"
-  initial: "camera.family_room"
-  max: 100
-  icon: mdi:camera
+  family_room_camera_entity:
+    name: "Family Room Camera Entity"
+    initial: "camera.family_room"
+    max: 100
+    icon: mdi:camera
 
-driveway_camera_entity:
-  name: "Driveway Camera Entity"
-  initial: "camera.driveway"
-  max: 100
-  icon: mdi:camera
+  driveway_camera_entity:
+    name: "Driveway Camera Entity"
+    initial: "camera.driveway"
+    max: 100
+    icon: mdi:camera
 
-kitchen_motion_sensor_entity:
-  name: "Kitchen Person Motion Sensor Entity"
-  initial: "binary_sensor.kitchen_person_motion"
-  max: 100
-  icon: mdi:motion-sensor
+  ai_task_entity:
+    name: "AI Tasks Entity"
+    initial: "ai_task.google_ai_task"
+    max: 100
+    icon: mdi:robot
 
-family_room_motion_sensor_entity:
-  name: "Family Room Person Motion Sensor Entity"  
-  initial: "binary_sensor.family_room_person_motion"
-  max: 100
-  icon: mdi:motion-sensor
+  kitchen_motion_sensor_entity:
+    name: "Kitchen Person Motion Sensor Entity"
+    initial: "binary_sensor.kitchen_person_motion"
+    max: 100
+    icon: mdi:motion-sensor
 
-# AI Analysis Result Storage
-kitchen_analysis_result:
-  name: "Kitchen Analysis Result"
-  initial: "unknown"
-  max: 50
-  icon: mdi:brain
+  family_room_motion_sensor_entity:
+    name: "Family Room Person Motion Sensor Entity"  
+    initial: "binary_sensor.family_room_person_motion"
+    max: 100
+    icon: mdi:motion-sensor
 
-kitchen_specific_tasks:
-  name: "Kitchen Specific Tasks"
-  initial: "Configure AI Tasks integration"
-  max: 200
-  icon: mdi:format-list-bulleted
+  # AI Analysis Result Storage
+  kitchen_analysis_result:
+    name: "Kitchen Analysis Result"
+    initial: "unknown"
+    max: 50
+    icon: mdi:brain
 
-family_room_analysis_result:
-  name: "Family Room Analysis Result"
-  initial: "unknown"
-  max: 50
-  icon: mdi:brain
+  kitchen_specific_tasks:
+    name: "Kitchen Specific Tasks"
+    initial: "Configure AI Tasks integration"
+    max: 255
+    icon: mdi:format-list-bulleted
 
-family_room_specific_tasks:
-  name: "Family Room Specific Tasks"
-  initial: "Configure AI Tasks integration"
-  max: 200
-  icon: mdi:format-list-bulleted
+  family_room_analysis_result:
+    name: "Family Room Analysis Result"
+    initial: "unknown"
+    max: 50
+    icon: mdi:brain
 
-driveway_analysis_result:
-  name: "Driveway Analysis Result" 
-  initial: "empty"
-  max: 50
-  icon: mdi:car
+  family_room_specific_tasks:
+    name: "Family Room Specific Tasks"
+    initial: "Configure AI Tasks integration"
+    max: 255
+    icon: mdi:format-list-bulleted
+
+  driveway_analysis_result:
+    name: "Driveway Analysis Result" 
+    initial: "empty"
+    max: 50
+    icon: mdi:car
 
 

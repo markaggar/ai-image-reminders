@@ -1,31 +1,45 @@
 # Family room tidied acknowledgment
 - id: family_room_tidied_acknowledgment
-    alias: "Family Room Tidied Acknowledgment"
-    description: "Acknowledge when family room has been tidied"
-    trigger:
-      - platform: state
-        entity_id: sensor.family_room_analysis
-        from: "needs_tidying"
-        to: "tidy"
-    condition:
-      - condition: state
-        entity_id: input_boolean.notifications_enabled
-        state: "on"
-    action:
-      # Clear the tidying notification
-      - service: notify.parents
-        data:
-          message: "clear_notification"
-          data:
-            tag: family_room_tidy
+  alias: "Family Room Tidied Acknowledgment"
+  description: "Acknowledge when family room has been tidied"
+  trigger:
+    - platform: state
+      entity_id: sensor.family_room_analysis
+      from: "needs_tidying"
+      to: "tidy"
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifications_enabled
+      state: "on"
+  action:
+    # Clear the tidying notification for Liam
+    - event: UNotify
+      event_data_template:
+        message: "clear_notification"
+        message_target: liam
+        tag: family_room_tidy
 
-      # Send acknowledgment
-      - service: notify.parents
-        data:
-          title: "Family Room Tidy! ✨"
-          message: "Thanks for tidying up the family room! It looks great."
-          data:
-            tag: family_room_tidied
-            message_speak: "yes"
-            message_display: "yes"
+    # Send encouraging acknowledgment to Liam
+    - event: UNotify
+      event_data_template:
+        message_speak: 'Fantastic job tidying the family room! You''re doing amazing!'
+        message_display: 'Family Room Tidy! ✨'
+        message: 'Thanks for tidying up the family room! It looks great - you''re amazing! 🌟'
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: liam
+        tag: family_room_tidied
+        
+    # Send status update to parents
+    - event: UNotify
+      event_data_template:
+        message_speak: 'no'
+        message_display: 'no'
+        message: 'Family room tidied at {{ now().strftime(''%H:%M'') }} - excellent work!'
+        priority: low
+        channel: General
+        aiprompt: 'no'
+        message_target: parents
+        tag: family_room_status
 

@@ -1,0 +1,65 @@
+# Walk Started Detection
+- id: walk_started_detection
+  alias: "Walk Started Detection"
+  description: "Detect when someone starts a dog walk and clear reminders"
+  trigger:
+    - platform: state
+      entity_id: sensor.driveway_analysis
+      to: "starting_dog_walk"
+  condition:
+    - condition: state
+      entity_id: input_boolean.dog_walk_monitoring_enabled
+      state: "on"
+    # Only trigger if not already on a walk
+    - condition: state
+      entity_id: input_boolean.walk_in_progress
+      state: "off"
+  action:
+    # Set walk in progress flag
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.walk_in_progress
+    
+    # Record walk start time
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.current_walk_started
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+    
+    # Clear any active walk reminder notifications for Liam
+    - event: UNotify
+      event_data_template:
+        message: "clear_notification"
+        message_target: liam
+        tag: morning_dog_walk
+    
+    - event: UNotify
+      event_data_template:
+        message: "clear_notification"
+        message_target: liam
+        tag: evening_dog_walk
+    
+    # Send encouraging walk started notification to Liam
+    - event: UNotify
+      event_data_template:
+        message_speak: 'Great! You''re taking the dog for a walk - have a wonderful time!'
+        message_display: 'Walk Started! 🚶‍♂️🐕'
+        message: 'Awesome! You''re taking the dog for a walk - have a great time together! 🐕❤️'
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: liam
+        tag: walk_started
+    
+    # Send status update to parents
+    - event: UNotify
+      event_data_template:
+        message_speak: 'no'
+        message_display: 'no'
+        message: 'Dog walk started at {{ now().strftime(''%H:%M'') }}.'
+        priority: low
+        channel: General
+        aiprompt: 'no'
+        message_target: parents
+        tag: walk_started_status

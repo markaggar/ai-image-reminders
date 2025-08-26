@@ -1,34 +1,40 @@
 # Morning dog walk reminder
 - id: morning_dog_walk_reminder
-    alias: "Morning Dog Walk Reminder"
-    description: "Remind to walk dog in the morning"
-    trigger:
-      - platform: time
-        at: "08:00:00"
-      - platform: time
-        at: "08:30:00"
-      - platform: time
-        at: "09:00:00"
-    condition:
-      - condition: state
-        entity_id: input_boolean.dog_walk_monitoring_enabled
-        state: "on"
-      - condition: state
-        entity_id: input_boolean.notifications_enabled
-        state: "on"
-      # Check if morning walk already done today
-      - condition: template
-        value_template: >
-          {% set morning_walk = states('input_datetime.morning_walk_done') %}
-          {% set today = now().strftime('%Y-%m-%d') %}
-          {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
-    action:
-      - service: notify.parents
-        data:
-          title: "Time for Morning Dog Walk! 🐕"
-          message: "Don't forget to take the dog for their morning walk."
-          data:
-            tag: morning_dog_walk
-            message_speak: "yes"
-            message_display: "yes"
+  alias: "Morning Dog Walk Reminder"
+  description: "Remind to walk dog in the morning/afternoon (12pm-3pm)"
+  trigger:
+    - platform: time
+      at: "12:00:00"
+    - platform: time
+      at: "12:30:00"
+    - platform: time
+      at: "13:00:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.dog_walk_monitoring_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.notifications_enabled
+      state: "on"
+    # Don't remind if walk is already in progress
+    - condition: state
+      entity_id: input_boolean.walk_in_progress
+      state: "off"
+    # Check if morning walk already done today
+    - condition: template
+      value_template: >
+        {% set morning_walk = states('input_datetime.morning_walk_done') %}
+        {% set today = now().strftime('%Y-%m-%d') %}
+        {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
+  action:
+    - event: UNotify
+      event_data_template:
+        message_speak: 'Time for your morning dog walk! Don''t forget the leash!'
+        message_display: 'Morning Dog Walk Time 🐕'
+        message: 'Time for your morning dog walk! It''s {{ now().strftime(''%H:%M'') }} - grab the leash and have a great walk! 🐕'
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: liam
+        tag: morning_dog_walk
 

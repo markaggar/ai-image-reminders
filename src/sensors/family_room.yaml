@@ -11,9 +11,9 @@
     name: "Family Room Analysis"
     unique_id: family_room_analysis_sensor
     state: >
-      {{ states('input_text.family_room_analysis_result') | default('unknown') }}
+      {{ states('sensor.family_room_tidy_status') | default(states('input_text.family_room_analysis_result')) | default('unknown') }}
     attributes:
       specific_tasks: >
-        {{ states('input_text.family_room_specific_tasks') | default('Set up AI Tasks integration for automated analysis') }}
-      last_updated: "{{ states('input_datetime.family_room_last_check') | default('never') }}"
+        {{ state_attr('sensor.family_room_tidy_status', 'tasks') | default(states('input_text.family_room_specific_tasks')) | default('Set up AI Tasks integration for automated analysis') }}
+      last_updated: "{{ state_attr('sensor.family_room_tidy_status', 'timestamp') | default(states('input_datetime.family_room_last_check')) | default('never') }}"
       threshold: "{{ states('input_number.family_room_cleanliness_threshold') }}%"

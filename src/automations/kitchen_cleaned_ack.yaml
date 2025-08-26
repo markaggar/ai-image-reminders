@@ -12,20 +12,34 @@
       entity_id: input_boolean.notifications_enabled
       state: "on"
   action:
-    # Clear the cleanup notification
-    - service: notify.parents
-      data:
+    # Clear the cleanup notification for Liam
+    - event: UNotify
+      event_data_template:
         message: "clear_notification"
-        data:
-          tag: kitchen_cleanup
+        message_target: liam
+        tag: kitchen_cleanup
 
-    # Send acknowledgment
-    - service: notify.parents
-      data:
-        title: "Kitchen Clean! ✨"
-        message: "Great job cleaning up the kitchen! It looks fantastic."
-        data:
-          tag: kitchen_cleaned
-          message_speak: "yes"
-          message_display: "yes"
+    # Send encouraging acknowledgment to Liam
+    - event: UNotify
+      event_data_template:
+        message_speak: 'Awesome job cleaning the kitchen! You''re doing great!'
+        message_display: 'Kitchen Clean! ✨'
+        message: 'Great job cleaning up the kitchen! It looks fantastic - you''re awesome! 🌟'
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: liam
+        tag: kitchen_cleaned
+        
+    # Send status update to parents
+    - event: UNotify
+      event_data_template:
+        message_speak: 'no'
+        message_display: 'no'
+        message: 'Kitchen cleaned at {{ now().strftime(''%H:%M'') }} - great work!'
+        priority: low
+        channel: General
+        aiprompt: 'no'
+        message_target: parents
+        tag: kitchen_status
 

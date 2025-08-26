@@ -1,28 +1,28 @@
 # Family room tidy notification
 - id: family_room_tidy_notification
-    alias: "Family Room Tidy Notification"
-    description: "Send notifications when family room is analyzed as tidy"
-    trigger:
-      - platform: state
-        entity_id: sensor.family_room_analysis
-        to: "tidy"
-    condition:
-      - condition: state
-        entity_id: input_boolean.family_room_monitoring_enabled
-        state: "on"
-      - condition: state
-        entity_id: input_boolean.notifications_enabled
-        state: "on"
-      # Only notify if this is a fresh analysis, not a transition
-      - condition: template
-        value_template: >
-          {% set from_state = trigger.from_state.state if trigger.from_state else 'unknown' %}
-          {{ from_state in ['unknown', 'unavailable', none] }}
-    action:
-      - service: notify.parents
+  alias: "Family Room Tidy Notification"
+  description: "Send notifications when family room is analyzed as tidy"
+  trigger:
+    - platform: state
+      entity_id: sensor.family_room_analysis
+      to: "tidy"
+  condition:
+    - condition: state
+      entity_id: input_boolean.family_room_monitoring_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.notifications_enabled
+      state: "on"
+    # Only notify if this is a fresh analysis, not a transition
+    - condition: template
+      value_template: >
+        {% set from_state = trigger.from_state.state if trigger.from_state else 'unknown' %}
+        {{ from_state in ['unknown', 'unavailable', none] }}
+  action:
+    - service: notify.parents
+      data:
+        title: "Family Room Looking Good! ✨"
+        message: "The family room is nice and tidy. Great job keeping it organized!"
         data:
-          title: "Family Room Looking Good! ✨"
-          message: "The family room is nice and tidy. Great job keeping it organized!"
-          data:
-            tag: family_room_good
+          tag: family_room_good
 

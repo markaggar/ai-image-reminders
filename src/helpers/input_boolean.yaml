@@ -1,40 +1,41 @@
-# Input Boolean Helper Entities
-ai_detection_enabled:
-  name: "AI Detection System Enabled"
-  icon: mdi:brain
+input_boolean:
+  # Input Boolean Helper Entities
+  ai_detection_enabled:
+    name: "AI Detection System Enabled"
+    icon: mdi:brain
 
-notifications_enabled:
-  name: "Notifications Enabled"
-  icon: mdi:bell
+  notifications_enabled:
+    name: "Notifications Enabled"
+    icon: mdi:bell
 
-kitchen_monitoring_enabled:
-  name: "Kitchen Monitoring Enabled" 
-  icon: mdi:chef-hat
+  kitchen_monitoring_enabled:
+    name: "Kitchen Monitoring Enabled" 
+    icon: mdi:chef-hat
 
-family_room_monitoring_enabled:
-  name: "Family Room Monitoring Enabled"
-  icon: mdi:sofa
+  family_room_monitoring_enabled:
+    name: "Family Room Monitoring Enabled"
+    icon: mdi:sofa
 
-dog_walk_monitoring_enabled:
-  name: "Dog Walk Monitoring Enabled"
-  icon: mdi:dog
+  dog_walk_monitoring_enabled:
+    name: "Dog Walk Monitoring Enabled"
+    icon: mdi:dog
 
-dog_walk_reminders_enabled:
-  name: "Dog Walk Reminders Enabled"
-  icon: mdi:dog
+  dog_walk_reminders_enabled:
+    name: "Dog Walk Reminders Enabled"
+    icon: mdi:dog
 
-force_kitchen_check:
-  name: "Force Kitchen Check"
-  icon: mdi:camera-iris
+  walk_in_progress:
+    name: "Walk In Progress"
+    icon: mdi:walk
 
-force_family_room_check:
-  name: "Force Family Room Check" 
-  icon: mdi:camera-iris
+  force_kitchen_check:
+    name: "Force Kitchen Check"
+    icon: mdi:camera-iris
 
-person_images_ready:
-  name: "Person Images Ready"
-  icon: mdi:account-check
-  
-pet_images_ready:
-  name: "Pet Images Ready"
-  icon: mdi:dog
+  force_family_room_check:
+    name: "Force Family Room Check" 
+    icon: mdi:camera-iris
+
+  driveway_video_ready:
+    name: "Driveway Video Ready"
+    icon: mdi:video-check

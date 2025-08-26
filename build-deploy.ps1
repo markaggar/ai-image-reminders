@@ -59,30 +59,37 @@ $buildSections = [ordered]@{
     "template:" = @{
         Path = "sensors/*.yaml"
         Description = "Template Sensors"
+        AddSectionHeader = $true
     }
     "automation:" = @{
         Path = "automations/*.yaml" 
         Description = "Automations"
+        AddSectionHeader = $true
     }
     "script:" = @{
         Path = "scripts/*.yaml"
         Description = "Scripts"
+        AddSectionHeader = $true
     }
     "input_boolean:" = @{
         Path = "helpers/input_boolean.yaml"
         Description = "Input Boolean Helpers"
+        AddSectionHeader = $false
     }
     "input_datetime:" = @{
         Path = "helpers/input_datetime.yaml"
         Description = "Input DateTime Helpers"
+        AddSectionHeader = $false
     }
     "input_number:" = @{
         Path = "helpers/input_number.yaml"
         Description = "Input Number Helpers"
+        AddSectionHeader = $false
     }
     "input_text:" = @{
         Path = "helpers/input_text.yaml"
         Description = "Input Text Helpers"
+        AddSectionHeader = $false
     }
 }
 
@@ -98,7 +105,11 @@ foreach ($section in $buildSections.GetEnumerator()) {
     
     if ($files) {
         $packageContent += "# $($config.Description)"
-        $packageContent += $sectionName
+        
+        # Only add section header if specified
+        if ($config.AddSectionHeader) {
+            $packageContent += $sectionName
+        }
         
         $fileCount = 0
         foreach ($file in $files | Sort-Object Name) {
@@ -125,8 +136,18 @@ foreach ($section in $buildSections.GetEnumerator()) {
                 $isListSection = $sectionName -in @("automation:", "template:")
                 
                 if ($isListSection -and $sectionName -eq "automation:") {
-                    # For automation sections - content already has correct indentation and list markers
-                    $packageContent += $cleanLines
+                    # For automation sections - need to indent all content by 2 spaces
+                    $indentedLines = @()
+                    foreach ($line in $cleanLines) {
+                        if ($line.Trim() -ne "") {
+                            # Add 2-space indentation for all non-empty content lines (including comments)
+                            $indentedLines += "  $line"
+                        } else {
+                            # Keep empty lines as-is
+                            $indentedLines += $line
+                        }
+                    }
+                    $packageContent += $indentedLines
                 } elseif ($isListSection -and $sectionName -eq "template:") {
                     # For template sections, content already has proper list structure
                     $indentedLines = @()
@@ -223,12 +244,36 @@ try {
 
 # YAML reload
 Write-Host "Attempting YAML reload instead of full restart..."
-$reloadServices = @("automation", "template", "input_boolean", "input_datetime", "input_number", "input_text", "script")
 
-foreach ($service in $reloadServices) {
+# Define correct reload endpoints for each service
+$reloadEndpoints = @{
+    "automation" = "automation/reload"
+    "template" = "template/reload" 
+    "input_boolean" = "homeassistant/reload_core_config"
+    "input_datetime" = "homeassistant/reload_core_config"
+    "input_number" = "homeassistant/reload_core_config"
+    "input_text" = "homeassistant/reload_core_config" 
+    "script" = "script/reload"
+}
+
+$coreConfigReloaded = $false
+
+foreach ($service in $reloadEndpoints.Keys) {
     try {
-        $reloadResult = Invoke-RestMethod -Uri "$HABaseURL/api/services/homeassistant/reload_config_entry" -Headers @{Authorization="Bearer $HAToken"} -Method Post -Body (@{domain=$service} | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 15
-        Write-Host "✅ Reloaded $service" -ForegroundColor Green
+        $endpoint = $reloadEndpoints[$service]
+        
+        # For core config helpers, only reload once
+        if ($endpoint -eq "homeassistant/reload_core_config") {
+            if (-not $coreConfigReloaded) {
+                $reloadResult = Invoke-RestMethod -Uri "$HABaseURL/api/services/homeassistant/reload_core_config" -Headers @{Authorization="Bearer $HAToken"} -Method Post -ContentType "application/json" -TimeoutSec 15
+                Write-Host "✅ Reloaded core config (input helpers)" -ForegroundColor Green
+                $coreConfigReloaded = $true
+            }
+        } else {
+            # For other services, use their specific reload endpoints
+            $reloadResult = Invoke-RestMethod -Uri "$HABaseURL/api/services/$endpoint" -Headers @{Authorization="Bearer $HAToken"} -Method Post -ContentType "application/json" -TimeoutSec 15
+            Write-Host "✅ Reloaded $service" -ForegroundColor Green
+        }
     } catch {
         Write-Warning "Failed to reload $service`: $($_.Exception.Message)"
     }

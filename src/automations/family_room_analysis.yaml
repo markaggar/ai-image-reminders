@@ -50,21 +50,30 @@
       data:
         datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
     
-    # Take camera snapshot and call AI Tasks to analyze family room
+    # Take camera snapshots for family room analysis
     - service: camera.snapshot
       target:
         entity_id: "{{ states('input_text.family_room_camera_entity') }}"
       data:
         filename: "/config/www/local/family_room_snapshot.jpg"
+        
+    # Take additional snapshot from kitchen camera (left side view into family room)
+    - service: camera.snapshot
+      target:
+        entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
+      data:
+        filename: "/config/www/local/family_room_kitchen_view_snapshot.jpg"
     
     - service: ai_task.generate_data
       data:
         task_name: "family_room_tidiness_analysis"
         instructions: >
-          Analyze this family room/living room. Focus ONLY on practical safety and cleanliness.
+          Analyze these family room/living room images. Focus ONLY on practical safety and cleanliness.
           Rate tidiness 0-100. If below {{ states('input_number.family_room_cleanliness_threshold') }}, 
           respond "needs_tidying" and list issues. If above, respond "tidy".
-          
+
+          Analysis of the family_room_kitchen_view_snapshot.jpg should exclude anything that is the kitchen. The family room is to the top left of the image, near the couch. If you see dirty dishes on the desk area between the kitchen and the family room, call that out too, but ignore the general clutter.
+
           ONLY flag these issues:
           - Food/drinks left out (especially if sticky/messy)
           - Dishes with food residue  
@@ -75,10 +84,39 @@
         attachments:
           - media_content_id: media-source://media_source/local/family_room_snapshot.jpg
             media_content_type: image/jpeg
+          - media_content_id: media-source://media_source/local/family_room_kitchen_view_snapshot.jpg
+            media_content_type: image/jpeg
         entity_id: ai_task.google_ai_task
       response_variable: family_room_ai_response
     
-    # Store the main result - extract status from response
+    # Store analysis result and tasks in variable sensor
+    - service: variable.update_sensor
+      data:
+        value: >
+          {% set response = family_room_ai_response.data | lower %}
+          {% if 'needs_tidying' in response %}
+            needs_tidying
+          {% elif 'tidy' in response %}
+            tidy  
+          {% else %}
+            unknown
+          {% endif %}
+        attributes:
+          timestamp: "{{ now() }}"
+          tasks: >
+            {% set response = family_room_ai_response.data %}
+            {% set ns = namespace(filtered=[]) %}
+            {% for line in response.split('\n') %}
+              {% if not ('needs_tidying' in line.lower() or 'tidy' in line.lower()) %}
+                {% set ns.filtered = ns.filtered + [line] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.filtered | join('\n') | trim }}
+        replace_attributes: true
+      target:
+        entity_id: sensor.family_room_tidy_status
+
+    # Also update the legacy input_text for backwards compatibility
     - service: input_text.set_value
       target:
         entity_id: input_text.family_room_analysis_result
@@ -92,33 +130,6 @@
           {% else %}
             unknown
           {% endif %}
-    
-    # Get specific tasks
-    - service: ai_task.generate_data
-      data:
-        task_name: "family_room_specific_tasks"
-        instructions: >
-          Look at this family room. Create a brief, family-friendly list of important tasks only:
-          
-          🍽️ DISHES: [plates, cups with food/drink to kitchen]
-          🧽 SPILLS: [sticky spots to wipe up]
-          🚶 FLOOR: [things on floor that could be tripped on]
-          
-          Keep it simple for kids to understand. Skip categories with no real issues.
-          IGNORE: blankets, remotes, books, decorative items, toys on furniture.
-          Example: "🍽️ DISHES: cup with milk to kitchen"
-        attachments:
-          - media_content_id: media-source://media_source/local/family_room_snapshot.jpg
-            media_content_type: image/jpeg
-        entity_id: ai_task.google_ai_task
-      response_variable: family_room_tasks_response
-    
-    # Store specific tasks
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.family_room_specific_tasks
-      data:
-        value: "{{ family_room_tasks_response.data | truncate(200) }}"
     
     # Turn off force check trigger  
     - service: input_boolean.turn_off

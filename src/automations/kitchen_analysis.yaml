@@ -50,12 +50,15 @@
       data:
         datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
         
-    # Take camera snapshot and call AI Tasks for kitchen analysis
+    # Take camera snapshots for kitchen analysis
     - service: camera.snapshot
       target:
         entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
       data:
         filename: "/config/www/local/kitchen_snapshot.jpg"
+        
+    # Fire tablet camera temporarily disabled due to Fully Kiosk integration issues
+    # TODO: Re-enable when fire tablet camera is stable
         
     - service: ai_task.generate_data
       data:
@@ -71,7 +74,7 @@
           - "clean" if kitchen is suitable for food preparation
           - "needs_attention" if there are minor issues (few dishes, small spills)
           - "needs_cleaning" if there are food safety concerns (food left out, many dirty dishes, significant mess)
-          
+
           Be family-friendly and focus on health/safety rather than perfection.
           Respond with just the category, then provide 2-3 specific helpful suggestions.
         attachments:
@@ -80,28 +83,49 @@
         entity_id: ai_task.google_ai_task
       response_variable: kitchen_ai_response
       
-    # Parse and store analysis result
+    # Store analysis result and tasks in variable sensor
+    - service: variable.update_sensor
+      data:
+        value: >
+          {% if 'needs_cleaning' in kitchen_ai_response.data | lower %}
+            needs_cleaning
+          {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
+            needs_attention
+          {% elif 'clean' in kitchen_ai_response.data | lower %}
+            clean
+          {% else %}
+            unknown
+          {% endif %}
+        attributes:
+          timestamp: "{{ now() }}"
+          tasks: >
+            {% set response = kitchen_ai_response.data %}
+            {% set ns = namespace(filtered=[]) %}
+            {% for line in response.split('\n') %}
+              {% if not ('needs_cleaning' in line.lower() or 'needs_attention' in line.lower() or 'clean' in line.lower()) %}
+                {% set ns.filtered = ns.filtered + [line] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.filtered | join('\n') | trim }}
+        replace_attributes: true
+      target:
+        entity_id: sensor.kitchen_clean_status
+        
+    # Also update the legacy input_text for backwards compatibility
     - service: input_text.set_value
       target:
         entity_id: input_text.kitchen_analysis_result
       data:
         value: >
-          {% if 'clean' in kitchen_ai_response.data | lower %}
-            clean
-          {% elif 'needs_cleaning' in kitchen_ai_response.data | lower %}
+          {% if 'needs_cleaning' in kitchen_ai_response.data | lower %}
             needs_cleaning
           {% elif 'needs_attention' in kitchen_ai_response.data | lower %}
             needs_attention
+          {% elif 'clean' in kitchen_ai_response.data | lower %}
+            clean
           {% else %}
             unknown
           {% endif %}
-    
-    # Store specific tasks/suggestions
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.kitchen_specific_tasks
-      data:
-        value: "{{ kitchen_ai_response.data }}"
     
     # Turn off force check trigger  
     - service: input_boolean.turn_off

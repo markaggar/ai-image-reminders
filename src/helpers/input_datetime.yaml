@@ -1,48 +1,55 @@
-# Input DateTime Helper Entities
-kitchen_last_check:
-  name: "Kitchen Last Check"
-  has_date: true
-  has_time: true
-  icon: mdi:clock-check
-  
-last_kitchen_notification:
-  name: "Last Kitchen Notification"
-  has_date: true
-  has_time: true
-  icon: mdi:bell-check
-  
-family_room_last_check:
-  name: "Family Room Last Check"
-  has_date: true
-  has_time: true
-  icon: mdi:clock-check
-  
-last_family_room_notification:
-  name: "Last Family Room Notification"
-  has_date: true
-  has_time: true
-  icon: mdi:bell-check
-  
-morning_walk_done:
-  name: "Morning Walk Done"
-  has_date: true
-  has_time: true
-  icon: mdi:dog
-  
-evening_walk_done:
-  name: "Evening Walk Done"
-  has_date: true
-  has_time: true
-  icon: mdi:dog
-  
-last_walk_detection:
-  name: "Last Walk Detection"
-  has_date: true
-  has_time: true
-  icon: mdi:camera-timer
-  
-last_dog_notification:
-  name: "Last Dog Notification"
-  has_date: true
-  has_time: true
-  icon: mdi:bell-check
+input_datetime:
+  # Input DateTime Helper Entities
+  kitchen_last_check:
+    name: "Kitchen Last Check"
+    has_date: true
+    has_time: true
+    icon: mdi:clock-check
+    
+  last_kitchen_notification:
+    name: "Last Kitchen Notification"
+    has_date: true
+    has_time: true
+    icon: mdi:bell-check
+    
+  family_room_last_check:
+    name: "Family Room Last Check"
+    has_date: true
+    has_time: true
+    icon: mdi:clock-check
+    
+  last_family_room_notification:
+    name: "Last Family Room Notification"
+    has_date: true
+    has_time: true
+    icon: mdi:bell-check
+    
+  morning_walk_done:
+    name: "Morning Walk Done"
+    has_date: true
+    has_time: true
+    icon: mdi:dog
+    
+  evening_walk_done:
+    name: "Evening Walk Done"
+    has_date: true
+    has_time: true
+    icon: mdi:dog
+    
+  current_walk_started:
+    name: "Current Walk Started"
+    has_date: true
+    has_time: true
+    icon: mdi:clock-start
+    
+  last_walk_detection:
+    name: "Last Walk Detection"
+    has_date: true
+    has_time: true
+    icon: mdi:camera-timer
+    
+  last_dog_notification:
+    name: "Last Dog Notification"
+    has_date: true
+    has_time: true
+    icon: mdi:bell-check

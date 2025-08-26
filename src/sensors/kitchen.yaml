@@ -11,9 +11,9 @@
     name: "Kitchen Analysis"
     unique_id: kitchen_analysis_sensor
     state: >
-      {{ states('input_text.kitchen_analysis_result') | default('unknown') }}
+      {{ states('sensor.kitchen_clean_status') | default(states('input_text.kitchen_analysis_result')) | default('unknown') }}
     attributes:
       specific_tasks: >
-        {{ states('input_text.kitchen_specific_tasks') | default('Set up AI Tasks integration for automated analysis') }}
-      last_updated: "{{ states('input_datetime.kitchen_last_check') | default('never') }}"
+        {{ state_attr('sensor.kitchen_clean_status', 'tasks') | default(states('input_text.kitchen_specific_tasks')) | default('Set up AI Tasks integration for automated analysis') }}
+      last_updated: "{{ state_attr('sensor.kitchen_clean_status', 'timestamp') | default(states('input_datetime.kitchen_last_check')) | default('never') }}"
       threshold: "{{ states('input_number.kitchen_cleanliness_threshold') }}%"

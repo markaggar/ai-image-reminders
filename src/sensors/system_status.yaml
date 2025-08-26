@@ -49,3 +49,55 @@
     attributes:
       last_updated: "{{ states('input_datetime.last_walk_detection') | default('never') }}"
       monitoring_active: "{{ is_state('input_boolean.dog_walk_monitoring_enabled', 'on') }}"
+      analysis_method: "video_based"
+      video_ready: "{{ is_state('input_boolean.driveway_video_ready', 'on') }}"
+
+- sensor:
+    name: "Walk Status"
+    unique_id: walk_status_sensor
+    state: >
+      {% if is_state('input_boolean.walk_in_progress', 'on') %}
+        in_progress
+      {% else %}
+        {% set today = now().strftime('%Y-%m-%d') %}
+        {% set morning_walk = states('input_datetime.morning_walk_done') %}
+        {% set evening_walk = states('input_datetime.evening_walk_done') %}
+        {% set morning_done = morning_walk != 'unknown' and morning_walk[:10] == today %}
+        {% set evening_done = evening_walk != 'unknown' and evening_walk[:10] == today %}
+        
+        {% if morning_done and evening_done %}
+          both_complete
+        {% elif morning_done %}
+          morning_complete
+        {% elif evening_done %}
+          evening_complete
+        {% else %}
+          pending
+        {% endif %}
+      {% endif %}
+    attributes:
+      walk_in_progress: "{{ is_state('input_boolean.walk_in_progress', 'on') }}"
+      walk_started: "{{ states('input_datetime.current_walk_started') | default('never') }}"
+      walk_duration_minutes: >
+        {% if is_state('input_boolean.walk_in_progress', 'on') %}
+          {% set start_time = states('input_datetime.current_walk_started') %}
+          {% if start_time != 'unknown' %}
+            {{ ((as_timestamp(now()) - as_timestamp(start_time)) / 60) | round(0) }}
+          {% else %}
+            unknown
+          {% endif %}
+        {% else %}
+          0
+        {% endif %}
+      morning_walk_done: "{{ states('input_datetime.morning_walk_done') | default('never') }}"
+      evening_walk_done: "{{ states('input_datetime.evening_walk_done') | default('never') }}"
+    icon: >
+      {% if is_state('sensor.walk_status', 'in_progress') %}
+        mdi:walk
+      {% elif is_state('sensor.walk_status', 'both_complete') %}
+        mdi:check-all
+      {% elif 'complete' in states('sensor.walk_status') %}
+        mdi:check
+      {% else %}
+        mdi:clock-outline
+      {% endif %}

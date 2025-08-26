@@ -30,12 +30,15 @@
       data:
         datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
       
-    # Send notification to parents
-    - service: notify.parents
-      data:
-        title: "Kitchen Needs Cleaning 🍽️"
-        message: >
-          Hey, when you're done in the kitchen, {{ state_attr('sensor.kitchen_analysis', 'specific_tasks') | default('please tidy up a bit') | lower }}.
-        data:
-          tag: kitchen_cleanup
+    # Send reminder to Liam
+    - event: UNotify
+      event_data_template:
+        message_speak: 'Hey Liam, the kitchen needs some attention when you have a moment'
+        message_display: 'Kitchen Needs Cleaning 🍽️'
+        message: 'Hey, when you''re done in the kitchen, {{ state_attr(''sensor.kitchen_analysis'', ''specific_tasks'') | default(''please tidy up a bit'') | lower }}.'
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: liam
+        tag: kitchen_cleanup
 

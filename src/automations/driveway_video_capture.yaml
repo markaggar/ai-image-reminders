@@ -1,0 +1,119 @@
+# Driveway Video Capture for Walk Detection
+- id: driveway_video_capture
+  alias: "Driveway Video Capture"
+  description: "Capture video when both person and pet motion detected in driveway within 30 seconds, OR when person detected during active walk"
+  mode: single
+  max_exceeded: silent
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.driveway_person
+      to: "on"
+      id: "person_motion"
+    - platform: state
+      entity_id: binary_sensor.driveway_pet  
+      to: "on"
+      id: "pet_motion"
+  condition:
+    # Only during hours when dog walks might happen
+    - condition: time
+      after: "06:00:00"
+      before: "22:00:00"
+    # Only analyze if camera entity is configured
+    - condition: template
+      value_template: >
+        {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
+  action:
+    # Check if this is a person detection during an active walk
+    - choose:
+        # Person detected during active walk - capture immediately for walk completion analysis
+        - conditions:
+            - condition: trigger
+              id: "person_motion"
+            - condition: state
+              entity_id: input_boolean.walk_in_progress
+              state: "on"
+          sequence:
+            # Update last detection time
+            - service: input_datetime.set_datetime
+              target:
+                entity_id: input_datetime.last_walk_detection
+              data:
+                datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+            
+            # Set video ready flag to false while capturing
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.driveway_video_ready
+            
+            # Capture video for walk completion analysis
+            - service: camera.record
+              target:
+                entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+              data:
+                duration: 30
+                lookback: 15
+                filename: "/config/www/local/driveway_walk_return_capture.mp4"
+            
+            # Wait for recording to complete
+            - delay: "00:00:32"
+            
+            # Set video ready flag to trigger analysis
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.driveway_video_ready
+      # No active walk - use normal dual-sensor logic
+      default:
+        # Wait for both sensors to trigger within 30 seconds
+        - choose:
+            # If person triggered first, wait for pet
+            - conditions:
+                - condition: trigger
+                  id: "person_motion"
+              sequence:
+                - wait_for_trigger:
+                    - platform: state
+                      entity_id: binary_sensor.driveway_pet
+                      to: "on"
+                  timeout: "00:00:30"
+                  continue_on_timeout: false
+            # If pet triggered first, wait for person  
+            - conditions:
+                - condition: trigger
+                  id: "pet_motion"
+              sequence:
+                - wait_for_trigger:
+                    - platform: state
+                      entity_id: binary_sensor.driveway_person
+                      to: "on"
+                  timeout: "00:00:30"
+                  continue_on_timeout: false
+        
+        # Both sensors detected - proceed with video capture
+        # Update last detection time
+        - service: input_datetime.set_datetime
+          target:
+            entity_id: input_datetime.last_walk_detection
+          data:
+            datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+        
+        # Set video ready flag to false while capturing
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.driveway_video_ready
+        
+        # Capture video with 15 second lookback and 30 second duration
+        - service: camera.record
+          target:
+            entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+          data:
+            duration: 30
+            lookback: 15
+            filename: "/config/www/local/driveway_dogwalk_capture.mp4"
+        
+        # Wait for recording to complete (30 seconds + small buffer)
+        - delay: "00:00:32"
+        
+        # Set video ready flag to trigger analysis
+        - service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.driveway_video_ready

@@ -1,34 +1,40 @@
 # Evening dog walk reminder
 - id: evening_dog_walk_reminder
   alias: "Evening Dog Walk Reminder"
-description: "Remind to walk dog in the evening"
-trigger:
-  - platform: time
-    at: "17:00:00"
-  - platform: time
-    at: "17:30:00"
-  - platform: time
-    at: "18:00:00"
-condition:
-  - condition: state
-    entity_id: input_boolean.dog_walk_monitoring_enabled
-    state: "on"
-  - condition: state
-    entity_id: input_boolean.notifications_enabled
-    state: "on"
-  # Check if evening walk already done today
-  - condition: template
-    value_template: >
-      {% set evening_walk = states('input_datetime.evening_walk_done') %}
-      {% set today = now().strftime('%Y-%m-%d') %}
-      {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
-action:
-  - service: notify.parents
-    data:
-      title: "Time for Evening Dog Walk! 🐕"
-      message: "Don't forget to take the dog for their evening walk."
-      data:
+  description: "Remind to walk dog in the evening (8:30pm-10pm)"
+  trigger:
+    - platform: time
+      at: "20:30:00"
+    - platform: time
+      at: "21:00:00"
+    - platform: time
+      at: "21:30:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.dog_walk_monitoring_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.notifications_enabled
+      state: "on"
+    # Don't remind if walk is already in progress
+    - condition: state
+      entity_id: input_boolean.walk_in_progress
+      state: "off"
+    # Check if evening walk already done today
+    - condition: template
+      value_template: >
+        {% set evening_walk = states('input_datetime.evening_walk_done') %}
+        {% set today = now().strftime('%Y-%m-%d') %}
+        {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
+  action:
+    - event: UNotify
+      event_data_template:
+        message_speak: 'Time for your evening dog walk! Don''t forget the leash!'
+        message_display: 'Evening Dog Walk Time 🐕'
+        message: 'Time for your evening dog walk! It''s {{ now().strftime(''%H:%M'') }} - grab the leash and have a great walk! 🐕'
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: liam
         tag: evening_dog_walk
-        message_speak: "yes"
-        message_display: "yes"
 

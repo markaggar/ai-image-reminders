@@ -1,0 +1,168 @@
+# Handle unclear walk return analysis
+- id: unclear_walk_return_notification
+  alias: "Unclear Walk Return Notification"
+  description: "Notify user when walk return analysis is unclear during active walk"
+  trigger:
+    - platform: state
+      entity_id: sensor.driveway_analysis
+      to: "unclear"
+  condition:
+    # Only trigger if a walk is in progress
+    - condition: state
+      entity_id: input_boolean.walk_in_progress
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.dog_walk_monitoring_enabled
+      state: "on"
+  action:
+    # Send notification asking for manual confirmation (to parents for oversight)
+    - event: UNotify
+      event_data_template:
+        message_speak: 'no'
+        message_display: 'no'
+        message: 'Someone returned to the driveway during the walk, but I couldn''t clearly see if the dog was with them due to lighting or positioning. Did the walk just finish?'
+        priority: normal
+        channel: General
+        aiprompt: 'no'
+        message_target: parents
+        tag: unclear_walk_return
+        actions:
+          - action: "confirm_walk_complete"
+            title: "Yes, Walk Complete ✅"
+          - action: "walk_still_ongoing"
+            title: "No, Still Walking 🚶‍♂️"
+
+# Handle user response to unclear walk return
+- id: handle_unclear_walk_response
+  alias: "Handle Unclear Walk Response"
+  description: "Process user's response to unclear walk return notification"
+  trigger:
+    - platform: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: "confirm_walk_complete"
+      id: "walk_complete"
+    - platform: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: "walk_still_ongoing"
+      id: "still_walking"
+  condition:
+    - condition: state
+      entity_id: input_boolean.dog_walk_monitoring_enabled
+      state: "on"
+  action:
+    # Clear the unclear walk notification first
+    - event: UNotify
+      event_data_template:
+        message: "clear_notification"
+        message_target: parents
+        tag: unclear_walk_return
+    
+    - choose:
+        # User confirmed walk is complete
+        - conditions:
+            - condition: trigger
+              id: "walk_complete"
+          sequence:
+            # Clear walk in progress flag
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.walk_in_progress
+            
+            # Determine time of day and mark appropriate walk complete
+            - choose:
+                # Morning time (6am-3pm)
+                - conditions:
+                    - condition: time
+                      after: "06:00:00"
+                      before: "15:00:00"
+                  sequence:
+                    # Check if morning walk not already done
+                    - condition: template
+                      value_template: >
+                        {% set morning_walk = states('input_datetime.morning_walk_done') %}
+                        {% set today = now().strftime('%Y-%m-%d') %}
+                        {{ morning_walk == 'unknown' or morning_walk[:10] != today }}
+                    
+                    # Mark morning walk complete
+                    - action: input_datetime.set_datetime
+                      target:
+                        entity_id: input_datetime.morning_walk_done
+                      data:
+                        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+                    
+                    # Clear morning walk notifications for Liam
+                    - event: UNotify
+                      event_data_template:
+                        message: "clear_notification"
+                        message_target: liam
+                        tag: morning_dog_walk
+                    
+                    # Send encouraging acknowledgment to Liam
+                    - event: UNotify
+                      event_data_template:
+                        message_speak: 'Awesome job with the morning walk! You''re the best!'
+                        message_display: 'Morning Walk Complete! 🐕❤️'
+                        message: 'Thanks for walking the dog! Morning walk marked as complete - you''re amazing!'
+                        priority: normal
+                        channel: General
+                        aiprompt: 'no'
+                        message_target: liam
+                        tag: walk_acknowledgment
+                
+                # Evening time (3pm-10pm)
+                - conditions:
+                    - condition: time
+                      after: "15:00:00" 
+                      before: "22:00:00"
+                  sequence:
+                    # Check if evening walk not already done
+                    - condition: template
+                      value_template: >
+                        {% set evening_walk = states('input_datetime.evening_walk_done') %}
+                        {% set today = now().strftime('%Y-%m-%d') %}
+                        {{ evening_walk == 'unknown' or evening_walk[:10] != today }}
+                    
+                    # Mark evening walk complete
+                    - action: input_datetime.set_datetime
+                      target:
+                        entity_id: input_datetime.evening_walk_done
+                      data:
+                        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+                    
+                    # Clear evening walk notifications for Liam
+                    - event: UNotify
+                      event_data_template:
+                        message: "clear_notification"
+                        message_target: liam
+                        tag: evening_dog_walk
+                    
+                    # Send encouraging acknowledgment to Liam
+                    - event: UNotify
+                      event_data_template:
+                        message_speak: 'Excellent job with the evening walk! You''re amazing!'
+                        message_display: 'Evening Walk Complete! 🐕❤️'
+                        message: 'Thanks for walking the dog! Evening walk marked as complete - you''re amazing!'
+                        priority: normal
+                        channel: General
+                        aiprompt: 'no'
+                        message_target: liam
+                        tag: walk_acknowledgment
+        
+        # User said walk is still ongoing
+        - conditions:
+            - condition: trigger
+              id: "still_walking"
+          sequence:
+            # Send acknowledgment that walk continues (to parents for status)
+            - event: UNotify
+              event_data_template:
+                message_speak: 'no'
+                message_display: 'no'
+                message: 'Got it! Walk marked as still in progress. I''ll keep monitoring for the return.'
+                priority: low
+                channel: General
+                aiprompt: 'no'
+                message_target: parents
+                tag: walk_acknowledgment
