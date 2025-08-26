@@ -1,0 +1,229 @@
+# AI Image Reminders Dashboard Configuration
+# Copy this YAML into your Home Assistant dashboard editor
+
+title: AI Image Reminders Control Center
+path: ai-image-reminders
+icon: mdi:brain
+badges: []
+cards:
+  - type: vertical-stack
+    title: System Status
+    cards:
+      - type: entities
+        title: AI Detection System
+        show_header_toggle: false
+        entities:
+          - entity: sensor.ai_detection_status
+            name: Detection System Status
+          - entity: input_boolean.ai_detection_enabled
+            name: AI Detection Enabled
+          - entity: input_boolean.notifications_enabled
+            name: Notifications Enabled
+          - entity: input_text.notification_target
+            name: Notification Target
+
+  - type: vertical-stack
+    title: Kitchen Monitoring
+    cards:
+      - type: entities
+        title: Kitchen Status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.kitchen_analysis
+            name: Current Status
+          - entity: sensor.kitchen_clean_status
+            name: Variable Sensor (Unlimited Storage)
+          - entity: input_datetime.kitchen_last_check
+            name: Last Analysis Time
+          - entity: input_datetime.last_kitchen_notification
+            name: Last Notification
+      - type: entities
+        title: Kitchen Controls
+        show_header_toggle: false
+        entities:
+          - entity: input_boolean.kitchen_monitoring_enabled
+            name: Kitchen Monitoring
+          - entity: input_boolean.force_kitchen_check
+            name: Force Analysis
+          - entity: input_text.kitchen_camera_entity
+            name: Camera Entity
+          - entity: input_text.kitchen_motion_sensor_entity
+            name: Motion Sensor
+
+  - type: vertical-stack
+    title: Family Room Monitoring
+    cards:
+      - type: entities
+        title: Family Room Status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.family_room_analysis
+            name: Current Status
+          - entity: sensor.family_room_tidy_status
+            name: Variable Sensor (Unlimited Storage)
+          - entity: input_datetime.family_room_last_check
+            name: Last Analysis Time
+          - entity: input_datetime.last_family_room_notification
+            name: Last Notification
+      - type: entities
+        title: Family Room Controls
+        show_header_toggle: false
+        entities:
+          - entity: input_boolean.family_room_monitoring_enabled
+            name: Family Room Monitoring
+          - entity: input_boolean.force_family_room_check
+            name: Force Analysis
+          - entity: input_text.family_room_camera_entity
+            name: Camera Entity
+          - entity: input_text.family_room_motion_sensor_entity
+            name: Motion Sensor
+
+  - type: vertical-stack
+    title: Dog Walk Tracking
+    cards:
+      - type: entities
+        title: Walk Status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.walk_status
+            name: Current Walk Status
+          - entity: input_boolean.walk_in_progress
+            name: Walk In Progress
+          - entity: input_datetime.current_walk_started
+            name: Current Walk Started
+          - entity: input_datetime.morning_walk_done
+            name: Morning Walk Done
+          - entity: input_datetime.evening_walk_done
+            name: Evening Walk Done
+      - type: entities
+        title: Walk Controls
+        show_header_toggle: false
+        entities:
+          - entity: input_boolean.dog_walk_monitoring_enabled
+            name: Walk Monitoring
+          - entity: input_boolean.dog_walk_reminders_enabled
+            name: Walk Reminders
+          - entity: input_text.driveway_camera_entity
+            name: Driveway Camera
+      - type: entities
+        title: Driveway Analysis
+        show_header_toggle: false
+        entities:
+          - entity: sensor.driveway_analysis
+            name: Last Analysis Result
+          - entity: input_datetime.last_walk_detection
+            name: Last Motion Detection
+          - entity: input_boolean.driveway_video_ready
+            name: Video Ready for Analysis
+
+  - type: vertical-stack
+    title: System Configuration
+    cards:
+      - type: entities
+        title: AI Integration Settings
+        show_header_toggle: false
+        entities:
+          - entity: input_text.ai_task_entity
+            name: AI Tasks Entity
+          - entity: input_number.notification_cooldown
+            name: Notification Cooldown (minutes)
+          - entity: input_number.dog_walk_max_hours
+            name: Max Walk Duration (hours)
+      - type: entities
+        title: Walk Reminders
+        show_header_toggle: false
+        entities:
+          - entity: input_datetime.morning_walk_reminder_time
+            name: Morning Walk Time
+          - entity: input_datetime.evening_walk_reminder_time
+            name: Evening Walk Time
+          - entity: input_boolean.morning_walk_completed
+            name: Morning Walk Manual Complete
+          - entity: input_boolean.evening_walk_completed
+            name: Evening Walk Manual Complete
+
+  - type: vertical-stack
+    title: Required Variable Sensors
+    cards:
+      - type: markdown
+        content: |
+          ## 📋 Required Variable Sensors
+          
+          **Create these variable sensors in Home Assistant:**
+          
+          ### Kitchen Analysis
+          ```yaml
+          # sensor.kitchen_clean_status
+          # Stores: status (clean/needs_cleaning)
+          # Attributes: tasks, timestamp, analysis_details
+          ```
+          
+          ### Family Room Analysis  
+          ```yaml
+          # sensor.family_room_tidy_status
+          # Stores: status (tidy/needs_tidying)
+          # Attributes: tasks, timestamp, analysis_details
+          ```
+          
+          ### Installation Steps:
+          1. Install **Variables + History** integration from HACS
+          2. Go to **Settings > Devices & Services > Variables**  
+          3. Create the sensors above with these exact names
+          4. The automations will automatically populate them with AI analysis results
+          
+          **Benefits:**
+          - ✅ Unlimited text storage (no 255 character limit)
+          - ✅ Historical tracking of all analysis results
+          - ✅ Rich attributes with detailed task lists
+          - ✅ Better integration with Home Assistant
+
+  - type: vertical-stack
+    title: Setup Requirements
+    cards:
+      - type: markdown
+        content: |
+          ## 🛠️ Integration Requirements
+          
+          **Required Integrations:**
+          
+          ### 1. AI Tasks Integration
+          - Install from HACS or manually
+          - Configure with Google AI, OpenAI, or compatible service
+          - Create entity: `ai_task.google_ai_task` (or update config)
+          
+          ### 2. Variables + History Integration  
+          - Install from HACS: **Variables + History**
+          - Create variable sensors (see above)
+          - Provides unlimited text storage for AI analysis
+          
+          ### 3. UNotify Integration
+          - Install UNotify for enhanced notifications
+          - Supports multi-modal delivery (audio + display + mobile)
+          - Configure notification targets: `liam` and `parents`
+          
+          ### 4. Camera Entities
+          - Configure camera entities for each monitored area
+          - Update entity names in configuration helpers
+          - Ensure cameras support video recording for driveway
+          
+          ### 5. Motion Sensors
+          - Set up person detection sensors for each area
+          - Binary sensors for driveway: `binary_sensor.driveway_person`, `binary_sensor.driveway_pet`
+          - Room sensors: `binary_sensor.kitchen_person_motion`, `binary_sensor.family_room_person_motion`
+
+  - type: history-graph
+    title: Analysis History
+    hours_to_show: 24
+    entities:
+      - sensor.kitchen_analysis
+      - sensor.family_room_analysis
+      - sensor.driveway_analysis
+
+  - type: logbook
+    title: Recent Activity
+    hours_to_show: 12
+    entities:
+      - sensor.kitchen_analysis
+      - sensor.family_room_analysis
+      - sensor.walk_status
+      - input_boolean.walk_in_progress

@@ -61,35 +61,103 @@ build-deploy.ps1         # Automated build and deployment
 ## 🚀 **Quick Start**
 
 ### **Prerequisites**
+
 - Home Assistant 2025.8+
-- AI Tasks integration (Google AI or compatible)
+- **AI Tasks integration** (Google AI, OpenAI, or compatible)
+- **Variables + History integration** (from HACS)
+- **UNotify integration** for enhanced notifications
 - Camera entities for monitoring areas
 - Motion sensors for person/pet detection
-- UNotify integration for enhanced notifications
+
+### **Required Variable Sensors**
+
+This package uses the Variables + History integration for unlimited AI analysis storage. Create these variable sensors:
+
+#### **Kitchen Analysis Storage**
+```yaml
+# Variable Sensor: sensor.kitchen_clean_status
+# Purpose: Unlimited storage for kitchen AI analysis results
+# Attributes: tasks, timestamp, analysis_details
+```
+
+#### **Family Room Analysis Storage**  
+```yaml
+# Variable Sensor: sensor.family_room_tidy_status
+# Purpose: Unlimited storage for family room AI analysis results
+# Attributes: tasks, timestamp, analysis_details
+```
+
+#### **Setup Steps:**
+1. **Install Variables + History** from HACS
+2. Go to **Settings > Devices & Services > Variables**
+3. Create variable sensors with the exact names above
+4. The automations will automatically populate them with AI results
 
 ### **Installation**
 
-1. **Clone the repository:**
+1. **Install Required Integrations:**
+   ```bash
+   # Install from HACS:
+   - AI Tasks (Google AI/OpenAI/compatible)
+   - Variables + History  
+   - UNotify
+   ```
+
+2. **Clone the repository:**
    ```powershell
    git clone https://github.com/markaggar/ai-image-reminders.git
    cd ai-image-reminders
    ```
 
-2. **Configure entity names in Home Assistant:**
+3. **Create required variable sensors:**
+   - Install Variables + History integration
+   - Create `sensor.kitchen_clean_status` 
+   - Create `sensor.family_room_tidy_status`
+
+4. **Configure entity names in Home Assistant:**
    - Update `input_text` helpers with your actual entity names:
      - Camera entities (`camera.kitchen`, `camera.family_room`, `camera.driveway`)
      - Motion sensors (`binary_sensor.kitchen_person_motion`, etc.)
      - AI Tasks entity (`ai_task.google_ai_task`)
 
-3. **Deploy the package:**
+5. **Deploy the package:**
    ```powershell
    .\build-deploy.ps1
    ```
 
-4. **Enable monitoring:**
+6. **Import the dashboard:**
+   - Copy contents of `dashboard-config.yaml` 
+   - Go to Home Assistant > Settings > Dashboards
+   - Create new dashboard and paste the YAML configuration
+
+7. **Enable monitoring:**
    - Turn on `input_boolean.ai_detection_enabled`
    - Enable specific monitoring: `kitchen_monitoring_enabled`, `family_room_monitoring_enabled`, `dog_walk_monitoring_enabled`
+   - Set notification target: `input_text.notification_target` (liam/parents)
    - Configure notification settings
+
+## 🎮 **Management Dashboard**
+
+A comprehensive Home Assistant dashboard is included for easy system management:
+
+### **Dashboard Features:**
+- **System Status**: AI detection system overview and controls
+- **Kitchen Monitoring**: Status, variable sensor data, and manual controls  
+- **Family Room Monitoring**: Status, analysis results, and configuration
+- **Dog Walk Tracking**: Walk status, completion times, and manual overrides
+- **System Configuration**: Entity settings, cooldowns, and integration setup
+- **Setup Guide**: Built-in requirements and variable sensor creation instructions
+- **History Graphs**: Visual timeline of analysis results
+- **Activity Log**: Recent system events and changes
+
+### **Dashboard Installation:**
+1. Copy the contents of `dashboard-config.yaml`
+2. Go to Home Assistant **Settings > Dashboards** 
+3. Click **+ Add Dashboard**
+4. Choose **"Take control"** and paste the YAML configuration
+5. Save as **"AI Image Reminders Control Center"**
+
+The dashboard provides a single control center for all system monitoring, configuration, and troubleshooting.
 
 ## ⚙️ **Configuration**
 

@@ -30,15 +30,25 @@
       data:
         datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
       
-    # Send reminder to Liam
+    # Send reminder based on notification target setting
     - event: UNotify
       event_data_template:
-        message_speak: 'Hey Liam, the kitchen needs some attention when you have a moment'
-        message_display: 'Kitchen Needs Cleaning 🍽️'
+        message_speak: >
+          {% if states('input_text.notification_target') == 'liam' %}
+          Hey Liam, the kitchen needs some attention when you have a moment
+          {% else %}
+          no
+          {% endif %}
+        message_display: >
+          {% if states('input_text.notification_target') == 'liam' %}
+          Kitchen Needs Cleaning 🍽️
+          {% else %}
+          no
+          {% endif %}
         message: 'Hey, when you''re done in the kitchen, {{ state_attr(''sensor.kitchen_analysis'', ''specific_tasks'') | default(''please tidy up a bit'') | lower }}.'
         priority: normal
         channel: General
         aiprompt: 'no'
-        message_target: liam
+        message_target: "{{ states('input_text.notification_target') }}"
         tag: kitchen_cleanup
 

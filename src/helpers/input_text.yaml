@@ -1,11 +1,15 @@
 input_text:
-  # Input Text Helper Entities
-  parents_notification_service:
-    name: "Parents Notification Service"
-    initial: "notify.parents"
-    max: 100
-    icon: mdi:account-group
+  # System Configuration
+  notification_target:
+    name: "Notification Target"
+    initial: "liam"
+    options:
+      - liam
+      - parents
+    max: 20
+    icon: mdi:account-circle
 
+  # Entity Configuration  
   kitchen_camera_entity:
     name: "Kitchen Camera Entity"
     initial: "camera.kitchen"
@@ -42,31 +46,7 @@ input_text:
     max: 100
     icon: mdi:motion-sensor
 
-  # AI Analysis Result Storage
-  kitchen_analysis_result:
-    name: "Kitchen Analysis Result"
-    initial: "unknown"
-    max: 50
-    icon: mdi:brain
-
-  kitchen_specific_tasks:
-    name: "Kitchen Specific Tasks"
-    initial: "Configure AI Tasks integration"
-    max: 255
-    icon: mdi:format-list-bulleted
-
-  family_room_analysis_result:
-    name: "Family Room Analysis Result"
-    initial: "unknown"
-    max: 50
-    icon: mdi:brain
-
-  family_room_specific_tasks:
-    name: "Family Room Specific Tasks"
-    initial: "Configure AI Tasks integration"
-    max: 255
-    icon: mdi:format-list-bulleted
-
+  # Legacy Analysis Storage (fallback for variable sensors)
   driveway_analysis_result:
     name: "Driveway Analysis Result" 
     initial: "empty"
