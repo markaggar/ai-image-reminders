@@ -130,17 +130,17 @@ cards:
           - entity: input_number.dog_walk_max_hours
             name: Max Walk Duration (hours)
       - type: entities
-        title: Walk Reminders
+        title: Walk Status & Control
         show_header_toggle: false
         entities:
-          - entity: input_datetime.morning_walk_reminder_time
-            name: Morning Walk Time
-          - entity: input_datetime.evening_walk_reminder_time
-            name: Evening Walk Time
-          - entity: input_boolean.morning_walk_completed
-            name: Morning Walk Manual Complete
-          - entity: input_boolean.evening_walk_completed
-            name: Evening Walk Manual Complete
+          - entity: input_datetime.morning_walk_done
+            name: Morning Walk Completed
+          - entity: input_datetime.evening_walk_done
+            name: Evening Walk Completed
+          - entity: input_datetime.current_walk_started
+            name: Current Walk Started
+          - entity: input_boolean.walk_in_progress
+            name: Walk In Progress
 
   - type: vertical-stack
     title: Required Variable Sensors
