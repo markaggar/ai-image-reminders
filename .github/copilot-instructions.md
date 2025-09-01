@@ -1,26 +1,25 @@
-<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
-- [x] Verify that the copilot-instructions.md file in the .github directory is created.
+# AI Image Reminders - ADHD Home Automation Package
 
-- [x] Clarify Project Requirements
-	<!-- Home Assistant package for ADHD monitoring with AI image detection using YAML configurations and Python scripts -->
+## Project Overview
+Home Assistant package providing ADHD-friendly automation using AI video/image analysis for room monitoring and dog walk tracking.
 
-- [x] Scaffold the Project
-	<!-- Created complete Home Assistant package structure with sensors, automations, scripts, and configuration files -->
+## Architecture Guidelines
+- Use modular YAML structure in src/ directories
+- Follow Home Assistant YAML conventions
+- No try/catch blocks (HA doesn't support them)
+- Use template conditions and choose/default blocks for error handling
+- Integrate with Variables + History for unlimited AI response storage
 
-- [x] Customize the Project
-	<!-- Developed comprehensive ADHD monitoring system with kitchen cleanliness detection, dog walking reminders, AI image analysis, and smart notification system tailored for ADHD support -->
+## Key Components
+- AI-powered room analysis (kitchen/family room)
+- Dog walk detection with dual-sensor logic
+- UNotify notifications with targeted messaging
+- Variable sensors for AI response storage
+- Comprehensive dashboard for monitoring
 
-- [x] Install Required Extensions
-	<!-- No extensions needed for Home Assistant package -->
-
-- [x] Compile the Project
-	<!-- No compilation needed for YAML-based Home Assistant package -->
-
-- [x] Create and Run Task
-	<!-- No tasks needed for Home Assistant package -->
-
-- [x] Launch the Project
-	<!-- Home Assistant package is ready for installation and configuration -->
-
-- [x] Ensure Documentation is Complete
-	<!-- README.md, FEATURES.md, INSTALL.md, and copilot-instructions.md are complete and current -->
+## Development Practices
+- Test YAML syntax before deployment
+- Use continue_on_error for service calls
+- Template-driven dynamic entity references
+- Proper error handling with conditions
+- Maintain backwards compatibility where possible

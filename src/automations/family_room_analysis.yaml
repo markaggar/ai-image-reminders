@@ -59,14 +59,14 @@
       target:
         entity_id: "{{ states('input_text.family_room_camera_entity') }}"
       data:
-        filename: "/config/www/local/family_room_snapshot.jpg"
+        filename: "/config/www/local/ai_image_notifications/family_room_snapshot.jpg"
         
     # Take additional snapshot from kitchen camera (left side view into family room)
     - service: camera.snapshot
       target:
         entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
       data:
-        filename: "/config/www/local/family_room_kitchen_view_snapshot.jpg"
+        filename: "/config/www/local/ai_image_notifications/family_room_kitchen_view_snapshot.jpg"
     
     - service: ai_task.generate_data
       data:
@@ -86,9 +86,9 @@
           
           IGNORE: blankets on chairs, remotes on tables, books/papers, decorative items, stuffed animals on furniture, charging cables
         attachments:
-          - media_content_id: media-source://media_source/local/family_room_snapshot.jpg
+          - media_content_id: media-source://media_source/local/ai_image_notifications/family_room_snapshot.jpg
             media_content_type: image/jpeg
-          - media_content_id: media-source://media_source/local/family_room_kitchen_view_snapshot.jpg
+          - media_content_id: media-source://media_source/local/ai_image_notifications/family_room_kitchen_view_snapshot.jpg
             media_content_type: image/jpeg
         entity_id: ai_task.google_ai_task
       response_variable: family_room_ai_response

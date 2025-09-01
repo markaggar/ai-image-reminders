@@ -56,6 +56,11 @@ if (Test-Path $headerFile) {
 
 # Component build order and sections
 $buildSections = [ordered]@{
+    "shell_command:" = @{
+        Path = "shell_commands.yaml"
+        Description = "Shell Commands"
+        AddSectionHeader = $false
+    }
     "template:" = @{
         Path = "sensors/*.yaml"
         Description = "Template Sensors"
@@ -136,15 +141,15 @@ foreach ($section in $buildSections.GetEnumerator()) {
                 $isListSection = $sectionName -in @("automation:", "template:")
                 
                 if ($isListSection -and $sectionName -eq "automation:") {
-                    # For automation sections - need to indent all content by 2 spaces
+                    # For automation sections - need to add 2 spaces to maintain list structure
                     $indentedLines = @()
                     foreach ($line in $cleanLines) {
-                        if ($line.Trim() -ne "") {
-                            # Add 2-space indentation for all non-empty content lines (including comments)
-                            $indentedLines += "  $line"
-                        } else {
+                        if ($line.Trim() -eq "" -or $line -match "^\s*$") {
                             # Keep empty lines as-is
                             $indentedLines += $line
+                        } else {
+                            # Add 2-space indentation for all content lines (comments and YAML)
+                            $indentedLines += "  $line"
                         }
                     }
                     $packageContent += $indentedLines

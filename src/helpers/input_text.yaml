@@ -43,4 +43,10 @@ input_text:
     max: 100
     icon: mdi:motion-sensor
 
+  driveway_analysis_result:
+    name: "Driveway Analysis Result"
+    initial: "empty"
+    max: 100
+    icon: mdi:video-check
+
 

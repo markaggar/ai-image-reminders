@@ -29,9 +29,9 @@ input_number:
     
   dog_walk_max_hours:
     name: "Dog Walk Max Hours"
-    min: 4
+    min: 2
     max: 16
     step: 1
-    initial: 8
+    initial: 2
     unit_of_measurement: "hours"
     icon: mdi:clock

@@ -59,7 +59,7 @@
       target:
         entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
       data:
-        filename: "/config/www/local/kitchen_snapshot.jpg"
+        filename: "/config/www/local/ai_image_notifications/kitchen_snapshot.jpg"
         
     # Fire tablet camera temporarily disabled due to Fully Kiosk integration issues
     # TODO: Re-enable when fire tablet camera is stable
@@ -82,7 +82,7 @@
           Be family-friendly and focus on health/safety rather than perfection.
           Respond with just the category, then provide 2-3 specific helpful suggestions.
         attachments:
-          - media_content_id: media-source://media_source/local/kitchen_snapshot.jpg
+          - media_content_id: media-source://media_source/local/ai_image_notifications/kitchen_snapshot.jpg
             media_content_type: image/jpeg
         entity_id: ai_task.google_ai_task
       response_variable: kitchen_ai_response

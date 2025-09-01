@@ -2,7 +2,7 @@
 # Comprehensive Home Assistant package using AI Tasks and native automations
 # ADHD-focused image reminders for kitchen cleanliness, family room tidying, and dog walking
 #
-# Generated from modular components: 2025-08-25 22:09:06
+# Generated from modular components: 2025-08-31 22:40:32
 # Source: Modular components in src/
 #
 # Features:
@@ -23,6 +23,19 @@
 # - Adjust cleanliness thresholds via input_number sliders
 # - Enable/disable monitoring via input_boolean toggles
 #
+
+
+# Shell Commands
+# Shell Commands for Video Backup System
+shell_command:
+  # Video backup rotation for driveway walk videos - single line approach
+  backup_driveway_walk_video: 'cd /config/www/local/ai_image_notifications; test -f "driveway_dogwalk_capture.mp4" && (test -f "driveway_dogwalk_capture_old.mp4" && mv "driveway_dogwalk_capture_old.mp4" "driveway_dogwalk_capture_old2.mp4"; mv "driveway_dogwalk_capture.mp4" "driveway_dogwalk_capture_old.mp4") || true'
+
+  # Create backup directories if they don't exist
+  ensure_backup_directories: 'mkdir -p /config/www/local/ai_image_notifications'
+
+  # Clean up old backup videos (keep only 3 versions)
+  cleanup_old_videos: 'cd /config/www/local/ai_image_notifications; find . -name "driveway_*_capture_old2.mp4" -mtime +7 -delete 2>/dev/null || true'
 
 
 # Template Sensors
@@ -174,272 +187,147 @@ template:
 
 # Automations
 automation:
-  # Driveway AI Analysis Automation
-  - id: driveway_ai_analysis
-    alias: "Driveway AI Analysis"
-    description: "Analyze driveway images when both person and pet images are ready"
-    trigger:
-      - platform: state
-        entity_id: 
-          - input_boolean.person_images_ready
-          - input_boolean.pet_images_ready
+  - id: driveway_video_ai_analysis
+    alias: Driveway Video AI Analysis
+    description: Analyze driveway video to detect dog walking activity
+    triggers:
+      - entity_id: input_boolean.driveway_video_ready
         to: "on"
-    condition:
+        trigger: state
+    conditions:
       - condition: state
         entity_id: input_boolean.ai_detection_enabled
         state: "on"
       - condition: state
         entity_id: input_boolean.dog_walk_monitoring_enabled
         state: "on"
-      # Both image sets must be ready
-      - condition: state
-        entity_id: input_boolean.person_images_ready
-        state: "on"
-      - condition: state
-        entity_id: input_boolean.pet_images_ready
-        state: "on"
-      # Only analyze if camera entity is configured
-      - condition: template
-        value_template: >
-          {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
-    action:
-      # Update last detection time
-      - service: input_datetime.set_datetime
-        target:
-          entity_id: input_datetime.last_walk_detection
-        data:
-          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-      # Analyze all 6 images with AI Tasks
-      - service: ai_task.generate_data
-        data:
-          task_name: "driveway_person_dog_detection"
+    actions:
+      - data:
+          task_name: driveway_video_dog_walk_detection
           instructions: >
-            Analyze these driveway images captured from person motion (first 3) and pet motion (last 3). Look for:
-            1. A person walking with a dog
-            2. Person and dog together in the scene
-            3. Dog walking activity (leash, person + dog movement)
-            If you see a person with a dog facing away from the camera or walking down the steps (that appears to be leaving), respond "starting_dog_walk".
-            If you see a person with a dog facing toward the camera or walking up the steps (that appears to be arriving), respond "ending_dog_walk".
-            If you see only a person, respond "person_only".
-            If you see only a dog, respond "dog_only".
-            If you see neither or just empty driveway, respond "empty".
-            Some of the images may not have anyone or any animal in the scene. Ignore those except for using the timestamp in the upper right corner to infer direction of travel.
-            Focus on detecting dog walking activity specifically and whether the walk is just starting or ending.
+              If one or more people and a dog are observed moving from the street towards
+              the house (e.g., entering the driveway, walking towards the front door from
+              the road, or otherwise returning home from a walk), classify this activity
+              as 'ending_dog_walk'.
+              If one or more people and a dog are observed moving from the house towards
+              the street (e.g., leaving the front door, walking down the driveway onto the
+              road, or otherwise departing for a walk), classify this activity as
+              'starting_dog_walk'.
+              Respond with "starting_dog_walk" or "ending_dog_walk" based on the
+              instructions above.
+                    or 
+                    - "dog_and_people" - if a dog is seen with a person or people but not
+                    appearing to be starting or ending a walk
+                    - "person_only" - if only a person is seen
+                    - "dog_person_separate" - if a dog and person are seen in the video but
+                    not in the same frame.
+                    - "dog_only" if only a dog is seen 
+                    - "empty" if no relevant activity is detected
+                    Focus on clear dog walking activity and direction of travel. In a
+                    separate paragraph, explain your reasoning.
           attachments:
-            - media_content_id: media-source://media_source/local/driveway_person_1.jpg
-              media_content_type: image/jpeg
-            - media_content_id: media-source://media_source/local/driveway_person_2.jpg
-              media_content_type: image/jpeg
-            - media_content_id: media-source://media_source/local/driveway_person_3.jpg
-              media_content_type: image/jpeg
-            - media_content_id: media-source://media_source/local/driveway_pet_1.jpg
-              media_content_type: image/jpeg
-            - media_content_id: media-source://media_source/local/driveway_pet_2.jpg
-              media_content_type: image/jpeg
-            - media_content_id: media-source://media_source/local/driveway_pet_3.jpg
-              media_content_type: image/jpeg
+            - media_content_id: media-source://media_source/local/ai_image_notifications/driveway_dogwalk_capture.mp4
+              media_content_type: video/mp4
           entity_id: ai_task.google_ai_task
-        response_variable: driveway_ai_response
-      # Store the driveway analysis result (extract only the first line)
-      - service: input_text.set_value
-        target:
+        response_variable: driveway_video_response
+        action: ai_task.generate_data
+      - target:
           entity_id: input_text.driveway_analysis_result
         data:
-          value: "{{ (driveway_ai_response.data | lower).split('\n')[0].strip() }}"
-      # Reset both image ready flags for next cycle
-      - service: input_boolean.turn_off
-        target:
-          entity_id: 
-            - input_boolean.person_images_ready
-            - input_boolean.pet_images_ready
-  # Driveway Video AI Analysis
-  - id: driveway_video_analysis
-    alias: "Driveway Video AI Analysis"
-    description: "Analyze driveway video to detect dog walking activity"
-    trigger:
-      - platform: state
-        entity_id: input_boolean.driveway_video_ready
-        to: "on"
-    condition:
-      - condition: state
-        entity_id: input_boolean.ai_detection_enabled
-        state: "on"
-      - condition: state
-        entity_id: input_boolean.dog_walk_monitoring_enabled
-        state: "on"
-    action:
-      # Choose appropriate video file and analysis prompt based on walk status
-      - choose:
-          # Walk in progress - analyze return video for completion
-          - conditions:
-              - condition: state
-                entity_id: input_boolean.walk_in_progress
-                state: "on"
-            sequence:
-              # Analyze the walk return video
-              - service: ai_task.generate_data
-                data:
-                  task_name: "driveway_walk_return_analysis"
-                  instructions: >
-                    Analyze the video for instances of a person walking a dog.
-                    Classify the activity as 'ending_dog_walk' if a person and their dog are
-                    observed moving from the street-facing side of the driveway up the driveway.
-                    Classify the activity as 'starting_dog_walk' if a person and their dog are
-                    observed moving down the driveway towards the street-facing side of the driveway.
-                    Respond with: - "starting_dog_walk" if person + dog are
-                    leaving for a walk - "ending_dog_walk" if person + dog are returning from a
-                    walk - "person_only" if only a person is seen - "dog_only" if only a dog
-                    is seen - "empty" if no relevant activity is detected Focus on clear dog
-                    walking activity and direction of travel.
-                    In a separate paragraph, explain your reasoning.
-                  attachments:
-                    - media_content_id: media-source://media_source/local/driveway_walk_return_capture.mp4
-                      media_content_type: video/mp4
-                  entity_id: ai_task.google_ai_task
-                response_variable: driveway_video_response
-        # No walk in progress - use normal dual-sensor analysis
-        default:
-          # Analyze the standard dual-sensor triggered video
-          - service: ai_task.generate_data
-            data:
-              task_name: "driveway_video_dog_walk_detection"
-              instructions: >
-                Analyze the video for instances of a person walking a dog.
-                Classify the activity as 'ending_dog_walk' if a person and their dog are
-                observed moving from the street-facing side of the driveway up the driveway.
-                Classify the activity as 'starting_dog_walk' if a person and their dog are
-                observed moving down the driveway towards the street-facing side of the driveway.
-                Respond with: - "starting_dog_walk" if person + dog are
-                leaving for a walk - "ending_dog_walk" if person + dog are returning from a
-                walk - "person_only" if only a person is seen - "dog_only" if only a dog
-                is seen - "empty" if no relevant activity is detected Focus on clear dog
-                walking activity and direction of travel.
-                In a separate paragraph, explain your reasoning.
-              attachments:
-                - media_content_id: media-source://media_source/local/driveway_dogwalk_capture.mp4
-                  media_content_type: video/mp4
-              entity_id: ai_task.google_ai_task
-            response_variable: driveway_video_response
-      # Store the analysis result (extract only the first line)
-      - service: input_text.set_value
-        target:
-          entity_id: input_text.driveway_analysis_result
-        data:
-          value: "{{ (driveway_video_response.data | lower).split('\n')[0].strip() }}"
-      # Reset video ready flag for next cycle
-      - service: input_boolean.turn_off
-        target:
+          value: |-
+            {{ (driveway_video_response.data | lower).split('
+            ')[0].strip() }}
+        action: input_text.set_value
+      - target:
           entity_id: input_boolean.driveway_video_ready
-  # Driveway Video Capture for Walk Detection
-  - id: driveway_video_capture
-    alias: "Driveway Video Capture"
-    description: "Capture video when both person and pet motion detected in driveway within 30 seconds, OR when person detected during active walk"
+        action: input_boolean.turn_off
+        data: {}
     mode: single
-    max_exceeded: silent
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.driveway_person
+  # Driveway Motion-Triggered Image Capture
+  - id: driveway_image_capture
+    alias: Driveway Video Capture
+    description: >-
+      Capture video when both person and pet motion detected in driveway within 30
+      seconds, OR when person detected during active walk
+    triggers:
+      - entity_id: binary_sensor.driveway_person
         to: "on"
-        id: "person_motion"
-      - platform: state
-        entity_id: binary_sensor.driveway_pet  
+        id: person_motion
+        trigger: state
+      - entity_id: binary_sensor.driveway_pet
         to: "on"
-        id: "pet_motion"
-    condition:
-      # Only during hours when dog walks might happen
+        id: pet_motion
+        trigger: state
+    conditions:
       - condition: time
         after: "06:00:00"
         before: "22:00:00"
-      # Only analyze if camera entity is configured
       - condition: template
-        value_template: >
+        value_template: |
           {{ states('input_text.driveway_camera_entity') not in ['unknown', ''] }}
-    action:
-      # Check if this is a person detection during an active walk
+    actions:
       - choose:
-          # Person detected during active walk - capture immediately for walk completion analysis
           - conditions:
               - condition: trigger
-                id: "person_motion"
+                id: person_motion
               - condition: state
-                entity_id: input_boolean.walk_in_progress
-                state: "on"
+                state: "off"
+                entity_id: binary_sensor.driveway_pet
             sequence:
-              # Update last detection time
-              - service: input_datetime.set_datetime
-                target:
-                  entity_id: input_datetime.last_walk_detection
-                data:
-                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-              # Set video ready flag to false while capturing
-              - service: input_boolean.turn_off
-                target:
-                  entity_id: input_boolean.driveway_video_ready
-              # Capture video for walk completion analysis
-              - service: camera.record
-                target:
-                  entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-                data:
-                  duration: 30
-                  lookback: 15
-                  filename: "/config/www/local/driveway_walk_return_capture.mp4"
-              # Wait for recording to complete
-              - delay: "00:00:32"
-              # Set video ready flag to trigger analysis
-              - service: input_boolean.turn_on
-                target:
-                  entity_id: input_boolean.driveway_video_ready
-        # No active walk - use normal dual-sensor logic
-        default:
-          # Wait for both sensors to trigger within 30 seconds
-          - choose:
-              # If person triggered first, wait for pet
-              - conditions:
-                  - condition: trigger
-                    id: "person_motion"
-                sequence:
-                  - wait_for_trigger:
-                      - platform: state
-                        entity_id: binary_sensor.driveway_pet
-                        to: "on"
-                    timeout: "00:00:30"
-                    continue_on_timeout: false
-              # If pet triggered first, wait for person  
-              - conditions:
-                  - condition: trigger
-                    id: "pet_motion"
-                sequence:
-                  - wait_for_trigger:
-                      - platform: state
-                        entity_id: binary_sensor.driveway_person
-                        to: "on"
-                    timeout: "00:00:30"
-                    continue_on_timeout: false
-          # Both sensors detected - proceed with video capture
-          # Update last detection time
-          - service: input_datetime.set_datetime
-            target:
-              entity_id: input_datetime.last_walk_detection
-            data:
-              datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-          # Set video ready flag to false while capturing
-          - service: input_boolean.turn_off
-            target:
-              entity_id: input_boolean.driveway_video_ready
-          # Capture video with 15 second lookback and 30 second duration
-          - service: camera.record
-            target:
-              entity_id: "{{ states('input_text.driveway_camera_entity') }}"
-            data:
-              duration: 30
-              lookback: 15
-              filename: "/config/www/local/driveway_dogwalk_capture.mp4"
-          # Wait for recording to complete (30 seconds + small buffer)
-          - delay: "00:00:32"
-          # Set video ready flag to trigger analysis
-          - service: input_boolean.turn_on
-            target:
-              entity_id: input_boolean.driveway_video_ready
+              - wait_for_trigger:
+                  - entity_id: binary_sensor.driveway_pet
+                    to: "on"
+                    trigger: state
+                timeout:
+                  hours: 0
+                  minutes: 0
+                  seconds: 15
+                  milliseconds: 0
+                continue_on_timeout: false
+          - conditions:
+              - condition: trigger
+                id: pet_motion
+              - condition: state
+                state: "off"
+                entity_id: binary_sensor.driveway_person
+            sequence:
+              - wait_for_trigger:
+                  - entity_id: binary_sensor.driveway_person
+                    to: "on"
+                    trigger: state
+                timeout:
+                  hours: 0
+                  minutes: 0
+                  seconds: 15
+                  milliseconds: 0
+                continue_on_timeout: false
+      - target:
+          entity_id: input_datetime.last_walk_detection
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+        action: input_datetime.set_datetime
+      - target:
+          entity_id: input_boolean.driveway_video_ready
+        action: input_boolean.turn_off
+        data: {}
+      - action: shell_command.ensure_backup_directories
+        continue_on_error: true
+      - action: shell_command.backup_driveway_walk_video
+        continue_on_error: true
+      - delay: "00:00:02"
+      - target:
+          entity_id: "{{ states('input_text.driveway_camera_entity') }}"
+        data:
+          duration: 30
+          filename: /config/www/local/ai_image_notifications/driveway_dogwalk_capture.mp4
+          lookback: 15
+        action: camera.record
+      - delay: "00:00:32"
+      - target:
+          entity_id: input_boolean.driveway_video_ready
+        action: input_boolean.turn_on
+        data: {}
+    mode: single
   # Evening dog walk reminder
   - id: evening_dog_walk_reminder
     alias: "Evening Dog Walk Reminder"
@@ -617,13 +505,13 @@ automation:
         target:
           entity_id: "{{ states('input_text.family_room_camera_entity') }}"
         data:
-          filename: "/config/www/local/family_room_snapshot.jpg"
+          filename: "/config/www/local/ai_image_notifications/family_room_snapshot.jpg"
       # Take additional snapshot from kitchen camera (left side view into family room)
       - service: camera.snapshot
         target:
           entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
         data:
-          filename: "/config/www/local/family_room_kitchen_view_snapshot.jpg"
+          filename: "/config/www/local/ai_image_notifications/family_room_kitchen_view_snapshot.jpg"
       - service: ai_task.generate_data
         data:
           task_name: "family_room_tidiness_analysis"
@@ -639,9 +527,9 @@ automation:
             - Spills that need cleaning
             IGNORE: blankets on chairs, remotes on tables, books/papers, decorative items, stuffed animals on furniture, charging cables
           attachments:
-            - media_content_id: media-source://media_source/local/family_room_snapshot.jpg
+            - media_content_id: media-source://media_source/local/ai_image_notifications/family_room_snapshot.jpg
               media_content_type: image/jpeg
-            - media_content_id: media-source://media_source/local/family_room_kitchen_view_snapshot.jpg
+            - media_content_id: media-source://media_source/local/ai_image_notifications/family_room_kitchen_view_snapshot.jpg
               media_content_type: image/jpeg
           entity_id: ai_task.google_ai_task
         response_variable: family_room_ai_response
@@ -846,7 +734,7 @@ automation:
         target:
           entity_id: "{{ states('input_text.kitchen_camera_entity') }}"
         data:
-          filename: "/config/www/local/kitchen_snapshot.jpg"
+          filename: "/config/www/local/ai_image_notifications/kitchen_snapshot.jpg"
       # Fire tablet camera temporarily disabled due to Fully Kiosk integration issues
       # TODO: Re-enable when fire tablet camera is stable
       - service: ai_task.generate_data
@@ -865,7 +753,7 @@ automation:
             Be family-friendly and focus on health/safety rather than perfection.
             Respond with just the category, then provide 2-3 specific helpful suggestions.
           attachments:
-            - media_content_id: media-source://media_source/local/kitchen_snapshot.jpg
+            - media_content_id: media-source://media_source/local/ai_image_notifications/kitchen_snapshot.jpg
               media_content_type: image/jpeg
           entity_id: ai_task.google_ai_task
         response_variable: kitchen_ai_response
@@ -1463,10 +1351,10 @@ input_number:
     
   dog_walk_max_hours:
     name: "Dog Walk Max Hours"
-    min: 4
+    min: 2
     max: 16
     step: 1
-    initial: 8
+    initial: 2
     unit_of_measurement: "hours"
     icon: mdi:clock
 
@@ -1516,6 +1404,12 @@ input_text:
     initial: "binary_sensor.family_room_person_motion"
     max: 100
     icon: mdi:motion-sensor
+
+  driveway_analysis_result:
+    name: "Driveway Analysis Result"
+    initial: "empty"
+    max: 100
+    icon: mdi:video-check
 
 
 

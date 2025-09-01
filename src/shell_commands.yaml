@@ -1,0 +1,10 @@
+# Shell Commands for Video Backup System
+shell_command:
+  # Video backup rotation for driveway walk videos - single line approach
+  backup_driveway_walk_video: 'cd /config/www/local/ai_image_notifications; test -f "driveway_dogwalk_capture.mp4" && (test -f "driveway_dogwalk_capture_old.mp4" && mv "driveway_dogwalk_capture_old.mp4" "driveway_dogwalk_capture_old2.mp4"; mv "driveway_dogwalk_capture.mp4" "driveway_dogwalk_capture_old.mp4") || true'
+
+  # Create backup directories if they don't exist
+  ensure_backup_directories: 'mkdir -p /config/www/local/ai_image_notifications'
+
+  # Clean up old backup videos (keep only 3 versions)
+  cleanup_old_videos: 'cd /config/www/local/ai_image_notifications; find . -name "driveway_*_capture_old2.mp4" -mtime +7 -delete 2>/dev/null || true'

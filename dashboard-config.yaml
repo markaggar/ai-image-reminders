@@ -29,14 +29,20 @@ cards:
         title: Kitchen Status
         show_header_toggle: false
         entities:
-          - entity: sensor.kitchen_analysis
-            name: Current Status
           - entity: sensor.kitchen_clean_status
-            name: Variable Sensor (Unlimited Storage)
+            name: Current Status
           - entity: input_datetime.kitchen_last_check
             name: Last Analysis Time
           - entity: input_datetime.last_kitchen_notification
             name: Last Notification
+      - type: custom:media-card
+        media_type: image
+        media_path: media-source://media_source/local/ai_image_notifications/kitchen_snapshot.jpg
+        title: ""
+        auto_refresh_seconds: 60
+        tap_action:
+          action: more-info
+          entity: camera.kitchen
       - type: entities
         title: Kitchen Controls
         show_header_toggle: false
@@ -57,14 +63,30 @@ cards:
         title: Family Room Status
         show_header_toggle: false
         entities:
-          - entity: sensor.family_room_analysis
-            name: Current Status
           - entity: sensor.family_room_tidy_status
-            name: Variable Sensor (Unlimited Storage)
+            name: Current Status
           - entity: input_datetime.family_room_last_check
             name: Last Analysis Time
           - entity: input_datetime.last_family_room_notification
             name: Last Notification
+      - type: horizontal-stack
+        cards:
+          - type: custom:media-card
+            media_type: image
+            media_path: media-source://media_source/local/ai_image_notifications/family_room_snapshot.jpg
+            title: "Main View"
+            auto_refresh_seconds: 60
+            tap_action:
+              action: more-info
+              entity: camera.family_room
+          - type: custom:media-card
+            media_type: image
+            media_path: media-source://media_source/local/ai_image_notifications/family_room_kitchen_view_snapshot.jpg
+            title: "Kitchen View"
+            auto_refresh_seconds: 60
+            tap_action:
+              action: more-info
+              entity: camera.kitchen
       - type: entities
         title: Family Room Controls
         show_header_toggle: false
@@ -95,16 +117,28 @@ cards:
             name: Morning Walk Done
           - entity: input_datetime.evening_walk_done
             name: Evening Walk Done
-      - type: entities
-        title: Walk Controls
-        show_header_toggle: false
-        entities:
-          - entity: input_boolean.dog_walk_monitoring_enabled
-            name: Walk Monitoring
-          - entity: input_boolean.dog_walk_reminders_enabled
-            name: Walk Reminders
-          - entity: input_text.driveway_camera_entity
-            name: Driveway Camera
+      - type: custom:media-card
+        media_type: video
+        media_path: media-source://media_source/local/ai_image_notifications/driveway_dogwalk_capture.mp4
+        title: "Latest Dog Walk Video"
+        video_autoplay: false
+        video_loop: true
+        auto_refresh_seconds: 30
+        show_refresh_button: true
+        video_muted: true
+        hide_video_controls_display: false
+        tap_action:
+          action: more-info
+          entity: camera.driveway
+      - type: markdown
+        title: Video Archive
+        content: |
+          **Dog Walk Videos:**
+          - [Current Walk Video](/local/ai_image_notifications/driveway_dogwalk_capture.mp4)
+          - [Previous Walk Video](/local/ai_image_notifications/driveway_dogwalk_capture_old.mp4)  
+          - [Older Walk Video](/local/ai_image_notifications/driveway_dogwalk_capture_old2.mp4)
+          
+          Click links to download/view backup videos. System maintains 3 copies of each video for debugging and analysis.
       - type: entities
         title: Driveway Analysis
         show_header_toggle: false
@@ -115,6 +149,52 @@ cards:
             name: Last Motion Detection
           - entity: input_boolean.driveway_video_ready
             name: Video Ready for Analysis
+          - entity: input_text.driveway_analysis_result
+            name: Analysis Result Details
+      - type: entities
+        title: Walk Controls
+        show_header_toggle: false
+        entities:
+          - entity: input_boolean.dog_walk_monitoring_enabled
+            name: Walk Monitoring
+          - entity: input_boolean.dog_walk_reminders_enabled
+            name: Walk Reminders
+          - entity: input_text.driveway_camera_entity
+            name: Driveway Camera
+      - type: horizontal-stack
+        cards:
+          - type: picture
+            title: Driveway Person 1
+            image: media-source://media_source/local/ai_image_notifications/driveway_person_1.jpg
+            tap_action:
+              action: none
+          - type: picture
+            title: Driveway Person 2
+            image: media-source://media_source/local/ai_image_notifications/driveway_person_2.jpg
+            tap_action:
+              action: none
+          - type: picture
+            title: Driveway Person 3
+            image: media-source://media_source/local/ai_image_notifications/driveway_person_3.jpg
+            tap_action:
+              action: none
+      - type: horizontal-stack
+        cards:
+          - type: picture
+            title: Driveway Pet 1
+            image: media-source://media_source/local/ai_image_notifications/driveway_pet_1.jpg
+            tap_action:
+              action: none
+          - type: picture
+            title: Driveway Pet 2
+            image: media-source://media_source/local/ai_image_notifications/driveway_pet_2.jpg
+            tap_action:
+              action: none
+          - type: picture
+            title: Driveway Pet 3
+            image: media-source://media_source/local/ai_image_notifications/driveway_pet_3.jpg
+            tap_action:
+              action: none
 
   - type: vertical-stack
     title: System Configuration
@@ -167,9 +247,10 @@ cards:
           
           ### Installation Steps:
           1. Install **Variables + History** integration from HACS
-          2. Go to **Settings > Devices & Services > Variables**  
-          3. Create the sensors above with these exact names
-          4. The automations will automatically populate them with AI analysis results
+          2. Install **Media Card** card (frontend) from HACS or http://github.com/markaggar/ha-media-card
+          3. Go to **Settings > Devices & Services > Variables**  
+          4. Create the sensors above with these exact names
+          5. The automations will automatically populate them with AI analysis results
           
           **Benefits:**
           - ✅ Unlimited text storage (no 255 character limit)

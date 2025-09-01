@@ -1,82 +1,65 @@
-# Driveway Video AI Analysis
-- id: driveway_video_analysis
-  alias: "Driveway Video AI Analysis"
-  description: "Analyze driveway video to detect dog walking activity"
-  trigger:
-    - platform: state
-      entity_id: input_boolean.driveway_video_ready
+- id: driveway_video_ai_analysis
+  alias: Driveway Video AI Analysis
+  description: Analyze driveway video to detect dog walking activity
+  triggers:
+    - entity_id: input_boolean.driveway_video_ready
       to: "on"
-  condition:
+      trigger: state
+  conditions:
     - condition: state
       entity_id: input_boolean.ai_detection_enabled
       state: "on"
     - condition: state
       entity_id: input_boolean.dog_walk_monitoring_enabled
       state: "on"
-  action:
-    # Choose appropriate video file and analysis prompt based on walk status
-    - choose:
-        # Walk in progress - analyze return video for completion
-        - conditions:
-            - condition: state
-              entity_id: input_boolean.walk_in_progress
-              state: "on"
-          sequence:
-            # Analyze the walk return video
-            - service: ai_task.generate_data
-              data:
-                task_name: "driveway_walk_return_analysis"
-                instructions: >
-                  Analyze the video for instances of a person walking a dog.
-                  Classify the activity as 'ending_dog_walk' if a person and their dog are
-                  observed moving from the street-facing side of the driveway up the driveway.
-                  Classify the activity as 'starting_dog_walk' if a person and their dog are
-                  observed moving down the driveway towards the street-facing side of the driveway.
-                  Respond with: - "starting_dog_walk" if person + dog are
-                  leaving for a walk - "ending_dog_walk" if person + dog are returning from a
-                  walk - "person_only" if only a person is seen - "dog_only" if only a dog
-                  is seen - "empty" if no relevant activity is detected Focus on clear dog
-                  walking activity and direction of travel.
+  actions:
+    - data:
+        task_name: driveway_video_dog_walk_detection
+        instructions: >
+            If one or more people and a dog are observed moving from the street towards
+            the house (e.g., entering the driveway, walking towards the front door from
+            the road, or otherwise returning home from a walk), classify this activity
+            as 'ending_dog_walk'.
 
-                  In a separate paragraph, explain your reasoning.
-                attachments:
-                  - media_content_id: media-source://media_source/local/driveway_walk_return_capture.mp4
-                    media_content_type: video/mp4
-                entity_id: ai_task.google_ai_task
-              response_variable: driveway_video_response
-      # No walk in progress - use normal dual-sensor analysis
-      default:
-        # Analyze the standard dual-sensor triggered video
-        - service: ai_task.generate_data
-          data:
-            task_name: "driveway_video_dog_walk_detection"
-            instructions: >
-              Analyze the video for instances of a person walking a dog.
-              Classify the activity as 'ending_dog_walk' if a person and their dog are
-              observed moving from the street-facing side of the driveway up the driveway.
-              Classify the activity as 'starting_dog_walk' if a person and their dog are
-              observed moving down the driveway towards the street-facing side of the driveway.
-              Respond with: - "starting_dog_walk" if person + dog are
-              leaving for a walk - "ending_dog_walk" if person + dog are returning from a
-              walk - "person_only" if only a person is seen - "dog_only" if only a dog
-              is seen - "empty" if no relevant activity is detected Focus on clear dog
-              walking activity and direction of travel.
+            If one or more people and a dog are observed moving from the house towards
+            the street (e.g., leaving the front door, walking down the driveway onto the
+            road, or otherwise departing for a walk), classify this activity as
+            'starting_dog_walk'.
 
-              In a separate paragraph, explain your reasoning.
-            attachments:
-              - media_content_id: media-source://media_source/local/driveway_dogwalk_capture.mp4
-                media_content_type: video/mp4
-            entity_id: ai_task.google_ai_task
-          response_variable: driveway_video_response
-    
-    # Store the analysis result (extract only the first line)
-    - service: input_text.set_value
-      target:
+            Respond with "starting_dog_walk" or "ending_dog_walk" based on the
+            instructions above.
+
+                  or 
+
+                  - "dog_and_people" - if a dog is seen with a person or people but not
+                  appearing to be starting or ending a walk
+
+                  - "person_only" - if only a person is seen
+
+                  - "dog_person_separate" - if a dog and person are seen in the video but
+                  not in the same frame.
+
+                  - "dog_only" if only a dog is seen 
+
+                  - "empty" if no relevant activity is detected
+
+                  Focus on clear dog walking activity and direction of travel. In a
+                  separate paragraph, explain your reasoning.
+        attachments:
+          - media_content_id: media-source://media_source/local/ai_image_notifications/driveway_dogwalk_capture.mp4
+            media_content_type: video/mp4
+        entity_id: ai_task.google_ai_task
+      response_variable: driveway_video_response
+      action: ai_task.generate_data
+    - target:
         entity_id: input_text.driveway_analysis_result
       data:
-        value: "{{ (driveway_video_response.data | lower).split('\n')[0].strip() }}"
-    
-    # Reset video ready flag for next cycle
-    - service: input_boolean.turn_off
-      target:
+        value: |-
+          {{ (driveway_video_response.data | lower).split('
+          ')[0].strip() }}
+      action: input_text.set_value
+    - target:
         entity_id: input_boolean.driveway_video_ready
+      action: input_boolean.turn_off
+      data: {}
+  mode: single
